@@ -12,6 +12,7 @@ import { addIcons } from 'ionicons';
 import {
   logOutOutline, moonOutline, notificationsOutline, shieldOutline,
   analyticsOutline, chatboxOutline, settingsOutline, callOutline,
+  pricetagOutline,
 } from 'ionicons/icons';
 
 @Component({
@@ -101,11 +102,11 @@ import {
                 <p>Automated call handling, logs</p>
               </ion-label>
             </ion-item>
-            <ion-item button detail>
-              <ion-icon name="shield-outline" slot="start" aria-hidden="true" color="tertiary"></ion-icon>
+            <ion-item button detail routerLink="/tabs/pricing">
+              <ion-icon name="pricetag-outline" slot="start" aria-hidden="true" color="success"></ion-icon>
               <ion-label>
-                <h3>Manage Users</h3>
-                <p>Add operators, set roles</p>
+                <h3>Dynamic Pricing</h3>
+                <p>10-factor adaptive pricing engine</p>
               </ion-label>
             </ion-item>
             <ion-item button detail routerLink="/tabs/notification-settings">
@@ -113,13 +114,6 @@ import {
               <ion-label>
                 <h3>SMS & Email Settings</h3>
                 <p>Templates, notifications, receipts</p>
-              </ion-label>
-            </ion-item>
-            <ion-item button detail>
-              <ion-icon name="settings-outline" slot="start" aria-hidden="true" color="dark"></ion-icon>
-              <ion-label>
-                <h3>Company Settings</h3>
-                <p>Locations, pricing, hours</p>
               </ion-label>
             </ion-item>
           </ion-list>
@@ -204,7 +198,7 @@ export class ProfileComponent {
   darkMode = false;
 
   constructor() {
-    addIcons({ logOutOutline, moonOutline, notificationsOutline, shieldOutline, analyticsOutline, chatboxOutline, settingsOutline, callOutline });
+    addIcons({ logOutOutline, moonOutline, notificationsOutline, shieldOutline, analyticsOutline, chatboxOutline, settingsOutline, callOutline, pricetagOutline });
     // #35 fix — persist dark mode from localStorage (SSR-safe)
     afterNextRender(() => {
       this.darkMode = localStorage.getItem('tez_dark_mode') === 'true';

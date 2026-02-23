@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { TabsComponent } from './tabs.component';
+import { roleGuard } from '../../core/guards/auth.guard';
 
 export const TABS_ROUTES: Routes = [
   {
@@ -50,6 +51,7 @@ export const TABS_ROUTES: Routes = [
       },
       {
         path: 'analytics',
+        canActivate: [roleGuard(['admin'])],
         loadComponent: () =>
           import('../analytics/analytics.component').then(
             (m) => m.AnalyticsComponent
@@ -57,6 +59,7 @@ export const TABS_ROUTES: Routes = [
       },
       {
         path: 'phone-settings',
+        canActivate: [roleGuard(['admin'])],
         loadComponent: () =>
           import('../settings/phone-settings/phone-settings.component').then(
             (m) => m.PhoneSettingsComponent
@@ -64,9 +67,18 @@ export const TABS_ROUTES: Routes = [
       },
       {
         path: 'notification-settings',
+        canActivate: [roleGuard(['admin'])],
         loadComponent: () =>
           import('../settings/notification-settings/notification-settings.component').then(
             (m) => m.NotificationSettingsComponent
+          ),
+      },
+      {
+        path: 'pricing',
+        canActivate: [roleGuard(['admin'])],
+        loadComponent: () =>
+          import('../settings/pricing-config/pricing-config.component').then(
+            (m) => m.PricingConfigComponent
           ),
       },
       {

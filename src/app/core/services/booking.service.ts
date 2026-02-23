@@ -134,6 +134,21 @@ export class BookingService implements OnDestroy {
     });
   }
 
+  /** Get dynamic price quote for a prospective booking */
+  async getPriceQuote(params: {
+    estimatedHours: number;
+    vehicleType?: string;
+    daysInAdvance?: number;
+    customerPhone?: string;
+  }): Promise<any> {
+    return this.api.call('getPriceQuote', params);
+  }
+
+  /** Calculate actual completion price based on real parking duration */
+  async calculateCompletionPrice(bookingId: string): Promise<any> {
+    return this.api.call('calculateCompletionPrice', { bookingId });
+  }
+
   /** Complete a booking with payment */
   async completeBooking(
     bookingId: string,

@@ -96,11 +96,33 @@ export class ActiveComponent {
 
   async onAction(event: { booking: Booking; action: string }): Promise<void> {
     if (event.action === 'complete') {
-      const ok = await this.ui.confirm('Complete', `Mark ticket #${event.booking.ticketNumber} as completed?`);
-      if (!ok) return;
       try {
+        // Calculate dynamic price
+        await this.ui.showLoading('Calculating price...');
+        let price: any;
+        try {
+          price = await this.bookingSvc.calculateCompletionPrice(event.booking.id);
+        } catch {
+          price = null;
+        }
+        await this.ui.hideLoading();
+
+        const priceDisplay = price?.totalPrice
+          ? `\n\nDynamic Price: $${price.totalPrice.toFixed(2)} (${price.estimatedHours?.toFixed(1)}h × $${price.effectiveHourlyRate?.toFixed(2)}/hr)`
+          : '';
+
+        const ok = await this.ui.confirm(
+          'Complete',
+          `Mark ticket #${event.booking.ticketNumber} as completed?${priceDisplay}`
+        );
+        if (!ok) return;
+
         await this.ui.showLoading('Completing...');
-        await this.bookingSvc.completeBooking(event.booking.id);
+        await this.bookingSvc.completeBooking(
+          event.booking.id,
+          'cash',
+          price?.totalPrice ?? 0,
+        );
         this.ui.toast('Ticket completed!');
       } catch { this.ui.toast('Failed to complete', 'danger'); }
       finally { await this.ui.hideLoading(); }

@@ -72,6 +72,12 @@ export {
 } from './services/admin';
 
 export {
+  getPriceQuote,
+  calculateCompletionPrice,
+  updatePricingConfig,
+} from './services/pricing';
+
+export {
   phoneWebhook,
   savePhoneConfig,
   getCallLog,
