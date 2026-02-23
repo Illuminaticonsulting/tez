@@ -15,13 +15,17 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.role == role;
     }
 
+    function hasAnyRole(roles) {
+      return isSignedIn() && request.auth.token.role in roles;
+    }
+
     function isAdmin(companyId) {
       return belongsToCompany(companyId) && hasRole('admin');
     }
 
     function isOperatorOrAdmin(companyId) {
       return belongsToCompany(companyId) &&
-             (hasRole('admin') || hasRole('operator'));
+             hasAnyRole(['admin', 'operator']);
     }
 
     // ── User profiles ────────────────────────────────────────
@@ -37,9 +41,8 @@ service cloud.firestore {
 
       // ── Bookings ────────────────────────────────────────────
       match /bookings/{bookingId} {
-        // All company members can read bookings
         allow read: if belongsToCompany(companyId);
-        // Only Cloud Functions write bookings (no client writes)
+        // ALL writes go through Cloud Functions
         allow write: if false;
       }
 
@@ -51,7 +54,6 @@ service cloud.firestore {
         // ── Parking Spots ───────────────────────────────────
         match /spots/{spotId} {
           allow read: if belongsToCompany(companyId);
-          // Only Cloud Functions write spots (atomic lock/assign)
           allow write: if false;
         }
       }
@@ -59,23 +61,44 @@ service cloud.firestore {
       // ── Meta (counters, settings) ──────────────────────────
       match /meta/{docId} {
         allow read: if belongsToCompany(companyId);
-        allow write: if false; // Only Cloud Functions
+        allow write: if false;
       }
 
       // ── Notifications ──────────────────────────────────────
       match /notifications/{notifId} {
         allow read: if belongsToCompany(companyId);
-        // Operators can mark as read
-        allow update: if isOperatorOrAdmin(companyId)
+        // Users can mark notifications as read only
+        allow update: if belongsToCompany(companyId)
                       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
-        allow create, delete: if false; // Only Cloud Functions
+        allow create, delete: if false;
       }
 
-      // ── Daily Stats ────────────────────────────────────────
-      match /stats/{dateId} {
-        allow read: if belongsToCompany(companyId);
-        allow write: if false; // Only Cloud Functions
+      // ── Daily/Monthly Stats ────────────────────────────────
+      match /stats/{statId} {
+        allow read: if isOperatorOrAdmin(companyId);
+        allow write: if false;
       }
+
+      // ── Audit Log ──────────────────────────────────────────
+      match /audit/{auditId} {
+        // Only admins can read audit logs
+        allow read: if isAdmin(companyId);
+        allow write: if false;
+      }
+
+      // ── Idempotency Keys (internal) ────────────────────────
+      match /_idempotency/{keyId} {
+        allow read, write: if false;
+      }
+    }
+
+    // ── System Collections (Cloud Functions only) ────────────
+    match /_rateLimits/{docId} {
+      allow read, write: if false;
+    }
+
+    match /_flightCache/{docId} {
+      allow read, write: if false;
     }
 
     // ── Default deny ─────────────────────────────────────────
