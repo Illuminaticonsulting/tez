@@ -15,7 +15,7 @@ import {
 import { Booking } from '../../../core/models';
 import { BookingService, UiService } from '../../../core/services';
 import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
-import { RelativeTimePipe, FormatDatePipe, FormatTimePipe } from '../../../shared/pipes/date.pipes';
+import { RelativeTimePipe, FormatDatePipe } from '../../../shared/pipes/date.pipes';
 
 @Component({
   selector: 'app-booking-detail',
@@ -26,7 +26,7 @@ import { RelativeTimePipe, FormatDatePipe, FormatTimePipe } from '../../../share
     IonContent, IonHeader, IonToolbar, IonTitle, IonButtons,
     IonBackButton, IonButton, IonIcon, IonList, IonItem,
     IonLabel, IonNote, IonChip, IonSkeletonText,
-    StatusBadgeComponent, RelativeTimePipe, FormatDatePipe, FormatTimePipe,
+    StatusBadgeComponent, RelativeTimePipe, FormatDatePipe,
   ],
   template: `
     <ion-header class="ion-no-border">
@@ -192,15 +192,25 @@ import { RelativeTimePipe, FormatDatePipe, FormatTimePipe } from '../../../share
     .notes-box { background: #f8f9fa; padding: 12px 16px; border-radius: 12px; font-size: 14px; color: #555; }
     .damage-box { background: #fff3f3; border: 1px solid #ffcdd2; padding: 12px 16px; border-radius: 12px; font-size: 14px; color: #c62828; }
     .timeline { padding-left: 20px; border-left: 2px solid #e0e0e0; }
-    .timeline-entry { position: relative; padding: 0 0 20px 20px; }
+    .timeline-entry { position: relative; padding: 0 0 24px 24px; }
+    .timeline-entry:last-child { padding-bottom: 0; }
     .timeline-dot {
       position: absolute; left: -9px; top: 4px; width: 16px; height: 16px;
-      border-radius: 50%; background: #1a1a2e; border: 3px solid white;
+      border-radius: 50%; background: linear-gradient(135deg, #1a1a2e, #0f3460);
+      border: 3px solid white; box-shadow: 0 2px 4px rgba(0,0,0,.1);
     }
-    .timeline-status { font-size: 14px; font-weight: 700; color: #1a1a2e; }
-    .timeline-note { font-size: 13px; color: #666; margin-top: 2px; }
-    .timeline-time { font-size: 11px; color: #bbb; margin-top: 4px; }
-    .detail-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 24px; }
+    .timeline-status { font-size: 15px; font-weight: 700; color: #1a1a2e; }
+    .timeline-note { font-size: 13px; color: #666; margin-top: 3px; }
+    .timeline-time { font-size: 11px; color: #bbb; margin-top: 4px; font-weight: 500; }
+    .detail-actions {
+      display: flex; flex-direction: column; gap: 10px; margin-top: 28px;
+      padding-bottom: 40px;
+      ion-button {
+        --border-radius: 16px;
+        font-weight: 700; font-size: 16px; min-height: 52px;
+        letter-spacing: 0.3px;
+      }
+    }
   `],
 })
 export class BookingDetailComponent implements OnInit {

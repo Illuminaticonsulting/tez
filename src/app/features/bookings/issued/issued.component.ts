@@ -23,38 +23,52 @@ import { SearchbarCustomEvent } from '@ionic/angular';
   template: `
     <ion-header class="ion-no-border">
       <ion-toolbar>
-        <ion-title>Issued <span class="count-badge">{{ filtered().length }}</span></ion-title>
+        <ion-title>
+          <span class="page-title">Issued</span>
+          <span class="count-badge" [attr.aria-label]="filtered().length + ' tickets'">{{ filtered().length }}</span>
+        </ion-title>
       </ion-toolbar>
       <ion-toolbar>
         <ion-searchbar
-          placeholder="Search by ticket, plate, name..."
+          placeholder="Search ticket, plate, or name..."
           [debounce]="300"
           (ionInput)="onSearch($event)"
           animated
           aria-label="Search issued tickets"
+          inputmode="search"
         ></ion-searchbar>
       </ion-toolbar>
     </ion-header>
 
     <ion-content>
       <ion-refresher slot="fixed" (ionRefresh)="onRefresh($event)">
-        <ion-refresher-content></ion-refresher-content>
+        <ion-refresher-content pullingText="Pull to refresh" refreshingText="Updating..."></ion-refresher-content>
       </ion-refresher>
 
       <div class="list-container">
         @if (bookingSvc.loading()) {
-          @for (i of [1,2,3]; track i) {
-            <div class="skeleton-card">
-              <ion-skeleton-text [animated]="true" style="width: 40%; height: 20px"></ion-skeleton-text>
-              <ion-skeleton-text [animated]="true" style="width: 80%; height: 16px; margin-top: 8px"></ion-skeleton-text>
-              <ion-skeleton-text [animated]="true" style="width: 60%; height: 14px; margin-top: 8px"></ion-skeleton-text>
+          @for (i of [1,2,3,4]; track i) {
+            <div class="skeleton-card" [style.animation-delay]="i * 100 + 'ms'">
+              <ion-skeleton-text [animated]="true" style="width: 35%; height: 22px"></ion-skeleton-text>
+              <ion-skeleton-text [animated]="true" style="width: 75%; height: 16px; margin-top: 10px"></ion-skeleton-text>
+              <ion-skeleton-text [animated]="true" style="width: 55%; height: 14px; margin-top: 8px"></ion-skeleton-text>
+              <div style="display: flex; gap: 8px; margin-top: 14px;">
+                <ion-skeleton-text [animated]="true" style="width: 50%; height: 42px; border-radius: 12px"></ion-skeleton-text>
+                <ion-skeleton-text [animated]="true" style="width: 50%; height: 42px; border-radius: 12px"></ion-skeleton-text>
+              </div>
             </div>
           }
         } @else if (filtered().length === 0) {
-          <div class="empty-state" role="status">
-            <span class="empty-icon">🎫</span>
-            <h3>No Issued Tickets</h3>
-            <p>Tickets that are checked-in or parked will appear here</p>
+          <div class="empty-state" role="status" aria-live="polite">
+            <div class="empty-illustration">🎫</div>
+            <h3 class="empty-title">No Issued Tickets</h3>
+            <p class="empty-desc">
+              @if (searchTerm()) {
+                No tickets match "{{ searchTerm() }}". Try a different search.
+              } @else {
+                When vehicles are checked-in or parked, they'll show up here.
+              }
+            </p>
           </div>
         } @else {
           @for (booking of filtered(); track booking.id) {
@@ -69,22 +83,39 @@ import { SearchbarCustomEvent } from '@ionic/angular';
     </ion-content>
   `,
   styles: [`
-    ion-toolbar { --background: #fafafa; }
-    ion-title { font-weight: 700; font-size: 20px; }
+    ion-toolbar { --background: #f5f6fa; }
+    .page-title { font-weight: 800; font-size: 22px; letter-spacing: -0.3px; }
     .count-badge {
       display: inline-flex; align-items: center; justify-content: center;
-      background: #1a1a2e; color: white; font-size: 12px; min-width: 24px;
-      height: 24px; border-radius: 12px; padding: 0 8px; margin-left: 8px; vertical-align: middle;
+      background: #1a1a2e; color: white; font-size: 12px; font-weight: 700;
+      min-width: 26px; height: 26px; border-radius: 13px; padding: 0 9px;
+      margin-left: 10px; vertical-align: middle;
     }
-    .list-container { padding: 16px; }
+    .list-container { padding: 12px 16px 100px; }
     .skeleton-card {
-      background: white; border-radius: 16px; padding: 20px; margin-bottom: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,.06);
+      background: white; border-radius: 20px; padding: 20px; margin-bottom: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.04);
+      animation: fadeInUp .4s ease both;
     }
-    .empty-state { text-align: center; padding: 60px 20px; color: #999; }
-    .empty-icon { font-size: 48px; }
-    .empty-state h3 { margin: 16px 0 8px; color: #555; }
-    .empty-state p { font-size: 14px; }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .empty-state {
+      text-align: center; padding: 80px 32px;
+      animation: fadeInUp .5s ease;
+    }
+    .empty-illustration {
+      font-size: 64px; margin-bottom: 16px;
+      filter: grayscale(0.2);
+    }
+    .empty-title {
+      font-size: 20px; font-weight: 800; color: #333; margin: 0 0 8px;
+    }
+    .empty-desc {
+      font-size: 15px; color: #999; margin: 0; max-width: 280px;
+      margin: 0 auto; line-height: 1.5;
+    }
   `],
 })
 export class IssuedComponent {
@@ -93,7 +124,7 @@ export class IssuedComponent {
   private ui = inject(UiService);
   private router = inject(Router);
 
-  private searchTerm = signal('');
+  readonly searchTerm = signal('');
 
   readonly filtered = computed(() => {
     const term = this.searchTerm().toLowerCase();
