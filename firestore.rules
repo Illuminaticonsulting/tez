@@ -1,0 +1,86 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function belongsToCompany(companyId) {
+      return isSignedIn() && request.auth.token.companyId == companyId;
+    }
+
+    function hasRole(role) {
+      return isSignedIn() && request.auth.token.role == role;
+    }
+
+    function isAdmin(companyId) {
+      return belongsToCompany(companyId) && hasRole('admin');
+    }
+
+    function isOperatorOrAdmin(companyId) {
+      return belongsToCompany(companyId) &&
+             (hasRole('admin') || hasRole('operator'));
+    }
+
+    // ── User profiles ────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow write: if false; // Only Cloud Functions can write
+    }
+
+    // ── Company root ─────────────────────────────────────────
+    match /companies/{companyId} {
+      allow read: if belongsToCompany(companyId);
+      allow write: if isAdmin(companyId);
+
+      // ── Bookings ────────────────────────────────────────────
+      match /bookings/{bookingId} {
+        // All company members can read bookings
+        allow read: if belongsToCompany(companyId);
+        // Only Cloud Functions write bookings (no client writes)
+        allow write: if false;
+      }
+
+      // ── Parking Locations ───────────────────────────────────
+      match /locations/{locationId} {
+        allow read: if belongsToCompany(companyId);
+        allow write: if isAdmin(companyId);
+
+        // ── Parking Spots ───────────────────────────────────
+        match /spots/{spotId} {
+          allow read: if belongsToCompany(companyId);
+          // Only Cloud Functions write spots (atomic lock/assign)
+          allow write: if false;
+        }
+      }
+
+      // ── Meta (counters, settings) ──────────────────────────
+      match /meta/{docId} {
+        allow read: if belongsToCompany(companyId);
+        allow write: if false; // Only Cloud Functions
+      }
+
+      // ── Notifications ──────────────────────────────────────
+      match /notifications/{notifId} {
+        allow read: if belongsToCompany(companyId);
+        // Operators can mark as read
+        allow update: if isOperatorOrAdmin(companyId)
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+        allow create, delete: if false; // Only Cloud Functions
+      }
+
+      // ── Daily Stats ────────────────────────────────────────
+      match /stats/{dateId} {
+        allow read: if belongsToCompany(companyId);
+        allow write: if false; // Only Cloud Functions
+      }
+    }
+
+    // ── Default deny ─────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

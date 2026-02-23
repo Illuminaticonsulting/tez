@@ -1,0 +1,137 @@
+/* ============================================================
+   Tez — Global Styles
+   ============================================================ */
+
+/* Ionic CSS */
+@import '@ionic/angular/css/core.css';
+@import '@ionic/angular/css/normalize.css';
+@import '@ionic/angular/css/structure.css';
+@import '@ionic/angular/css/typography.css';
+@import '@ionic/angular/css/padding.css';
+@import '@ionic/angular/css/float-elements.css';
+@import '@ionic/angular/css/text-alignment.css';
+@import '@ionic/angular/css/text-transformation.css';
+@import '@ionic/angular/css/flex-utils.css';
+@import '@ionic/angular/css/display.css';
+
+/* ---- CSS Variables ---- */
+:root {
+  /* Brand */
+  --tez-primary: #1a1a2e;
+  --tez-primary-light: #16213e;
+  --tez-accent: #fcc00b;
+  --tez-accent-dark: #daa400;
+
+  /* Ionic overrides */
+  --ion-color-primary: #1a1a2e;
+  --ion-color-primary-rgb: 26, 26, 46;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-shade: #141425;
+  --ion-color-primary-tint: #313143;
+
+  --ion-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --ion-background-color: #fafafa;
+  --ion-text-color: #1a1a2e;
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* Border radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* ---- Dark Mode ---- */
+body.dark {
+  --ion-background-color: #121212;
+  --ion-text-color: #e0e0e0;
+  --ion-card-background: #1e1e1e;
+  --ion-toolbar-background: #1a1a1a;
+  --ion-tab-bar-background: #1a1a1a;
+  --ion-item-background: #1e1e1e;
+}
+
+/* ---- Global resets ---- */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--ion-font-family);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ---- Utility classes ---- */
+.text-center { text-align: center; }
+.text-bold { font-weight: 700; }
+.text-muted { color: #999; }
+.mt-1 { margin-top: 8px; }
+.mt-2 { margin-top: 16px; }
+.mt-3 { margin-top: 24px; }
+.mb-1 { margin-bottom: 8px; }
+.mb-2 { margin-bottom: 16px; }
+.mb-3 { margin-bottom: 24px; }
+.p-1 { padding: 8px; }
+.p-2 { padding: 16px; }
+.gap-1 { gap: 8px; }
+.gap-2 { gap: 16px; }
+
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.flex-1 { flex: 1; }
+.flex-wrap { flex-wrap: wrap; }
+
+/* ---- Scrollbar ---- */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ---- Ionic overrides for polish ---- */
+ion-content {
+  --background: #fafafa;
+}
+
+ion-toolbar {
+  --background: #ffffff;
+  --border-width: 0;
+}
+
+ion-searchbar {
+  --background: #f0f0f0;
+  --border-radius: 12px;
+  --box-shadow: none;
+  --placeholder-color: #999;
+}
+
+ion-tab-bar {
+  --background: #ffffff;
+  --border: 1px solid #f0f0f0;
+}
+
+/* ---- Print styles ---- */
+@media print {
+  ion-tab-bar,
+  ion-header,
+  app-notification-banner {
+    display: none !important;
+  }
+}
