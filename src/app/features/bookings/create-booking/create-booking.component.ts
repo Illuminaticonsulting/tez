@@ -1,5 +1,5 @@
 import {
-  Component, inject, signal, computed, ChangeDetectionStrategy,
+  Component, inject, signal, ChangeDetectionStrategy,
   Output, EventEmitter,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -302,9 +302,10 @@ export class CreateBookingComponent {
     });
   }
 
-  readonly isValid = computed(() => {
+  /** Method, not computed, because form fields are plain properties (not signals) */
+  isValid(): boolean {
     return !!(this.form.customerName?.trim() && this.form.vehiclePlate?.trim());
-  });
+  }
 
   async dismiss(data?: any): Promise<void> {
     await this.modalCtrl.dismiss(data);

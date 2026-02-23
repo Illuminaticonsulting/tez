@@ -14,6 +14,17 @@ import { db, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX } from '../config';
 // In-memory first-pass (fast, per-instance)
 const localMap = new Map<string, { count: number; windowStart: number }>();
 
+// Periodic cleanup to prevent memory leak (every 60 seconds)
+const LOCAL_MAP_CLEANUP_INTERVAL = 60_000;
+setInterval(() => {
+  const now = Date.now();
+  for (const [uid, entry] of localMap) {
+    if (now - entry.windowStart > RATE_LIMIT_WINDOW_MS * 2) {
+      localMap.delete(uid);
+    }
+  }
+}, LOCAL_MAP_CLEANUP_INTERVAL).unref(); // unref so it doesn't keep the process alive
+
 /**
  * Check rate limit for a user.
  * Uses in-memory cache first, then Firestore for cross-instance accuracy.

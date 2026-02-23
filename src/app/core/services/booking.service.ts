@@ -10,6 +10,7 @@ import { FirestoreService } from './firestore.service';
 import { AuthService } from './auth.service';
 import { ApiService } from './api.service';
 import { NotificationService } from './notification.service';
+import { firstValueFrom, timeout, catchError, of } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class BookingService implements OnDestroy {
@@ -181,6 +182,33 @@ export class BookingService implements OnDestroy {
   /** Check if a status transition is valid */
   canTransition(from: BookingStatus, to: BookingStatus): boolean {
     return VALID_TRANSITIONS[from]?.includes(to) ?? false;
+  }
+
+  /** Fetch ALL bookings (including Completed/Cancelled) for analytics.
+   *  Returns all bookings within the given number of days (default 30). */
+  async getAllBookingsForAnalytics(days = 30): Promise<Booking[]> {
+    const companyId = this.auth.companyId();
+    if (!companyId) return [];
+
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+
+    try {
+      return await firstValueFrom(
+        this.db.getCollection<Booking>(
+          `companies/${companyId}/bookings`,
+          [
+            where('createdAt', '>=', cutoff),
+            orderBy('createdAt', 'desc'),
+          ]
+        ).pipe(
+          timeout(10000),
+          catchError(() => of([] as Booking[]))
+        )
+      );
+    } catch {
+      return [];
+    }
   }
 
   ngOnDestroy(): void {

@@ -1328,7 +1328,7 @@ describe('releaseSpot handler', () => {
     } as any;
     await expect(
       (releaseSpot as any)({ locationId: 'loc-1', spotId: 'spot-R1' }, ctx),
-    ).rejects.toThrow(/company/i);
+    ).rejects.toThrow(/role|company/i);
   });
 });
 

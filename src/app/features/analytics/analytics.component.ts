@@ -155,6 +155,7 @@ export class AnalyticsComponent {
   private bookingSvc = inject(BookingService);
 
   readonly period = signal<Period>('today');
+  readonly analyticsBookings = signal<Booking[]>([]);
 
   private toDate(val: unknown): Date {
     if (val instanceof Date) return val;
@@ -162,8 +163,18 @@ export class AnalyticsComponent {
     return new Date();
   }
 
+  constructor() {
+    addIcons({ carOutline, cashOutline, trendingUpOutline, peopleOutline, calendarOutline, timeOutline });
+    this.loadAnalytics();
+  }
+
+  private async loadAnalytics(): Promise<void> {
+    const all = await this.bookingSvc.getAllBookingsForAnalytics(30);
+    this.analyticsBookings.set(all);
+  }
+
   private readonly filtered = computed<Booking[]>(() => {
-    const bookings = this.bookingSvc.allBookings();
+    const bookings = this.analyticsBookings();
     const now = new Date();
     const p = this.period();
     const cutoff = new Date();
@@ -228,15 +239,13 @@ export class AnalyticsComponent {
       .map(([name, count]) => ({ name, count }));
   });
 
-  constructor() {
-    addIcons({ carOutline, cashOutline, trendingUpOutline, peopleOutline, calendarOutline, timeOutline });
-  }
-
   onPeriodChange(event: CustomEvent): void {
     this.period.set(event.detail.value as Period);
   }
 
   doRefresh(event: CustomEvent): void {
-    setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 500);
+    this.loadAnalytics().then(() => {
+      (event.target as HTMLIonRefresherElement).complete();
+    });
   }
 }

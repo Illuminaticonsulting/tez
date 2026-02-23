@@ -11,6 +11,7 @@ import {
 import { AuthService, UiService } from '../../../core/services';
 import { FirestoreService } from '../../../core/services/firestore.service';
 import { ApiService } from '../../../core/services/api.service';
+import { firstValueFrom, timeout, catchError, of } from 'rxjs';
 
 interface PricingFactor {
   name: string;
@@ -635,8 +636,13 @@ export class PricingConfigComponent implements OnInit {
     if (!companyId) return;
 
     try {
-      const doc = await this.db.getDocument<Record<string, any>>(
-        `companies/${companyId}/settings/pricing`
+      const doc = await firstValueFrom(
+        this.db.getDocument<Record<string, any>>(
+          `companies/${companyId}/settings/pricing`
+        ).pipe(
+          timeout(5000),
+          catchError(() => of(null))
+        )
       );
       if (doc) {
         this.config.set({ ...this.config(), ...doc });

@@ -300,8 +300,29 @@ export class BookingDetailComponent implements OnInit {
       case 'complete': {
         const ok = await this.ui.confirm('Complete', `Complete ticket #${b.ticketNumber}?`);
         if (!ok) return;
+        await this.ui.showLoading('Calculating price...');
+        let price: any = null;
+        try {
+          price = await this.bookingSvc.calculateCompletionPrice(b.id);
+        } catch { /* fallback to 0 */ }
+        await this.ui.hideLoading();
+
+        const priceDisplay = price?.totalPrice
+          ? `\n\nDynamic Price: $${price.totalPrice.toFixed(2)}`
+          : '';
+        const confirmPrice = await this.ui.confirm(
+          'Confirm Charge',
+          `Complete ticket #${b.ticketNumber}?${priceDisplay}`
+        );
+        if (!confirmPrice) return;
+
         await this.ui.showLoading('Completing...');
-        try { await this.bookingSvc.completeBooking(b.id); this.ui.toast('Completed!'); this.router.navigateByUrl('/tabs/issued'); } catch { this.ui.toast('Failed', 'danger'); } finally { await this.ui.hideLoading(); }
+        try {
+          await this.bookingSvc.completeBooking(b.id, 'cash', price?.totalPrice ?? 0);
+          this.ui.toast('Completed!');
+          this.router.navigateByUrl('/tabs/issued');
+        } catch { this.ui.toast('Failed', 'danger'); }
+        finally { await this.ui.hideLoading(); }
         break;
       }
       case 'cancel': {

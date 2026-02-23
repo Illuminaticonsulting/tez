@@ -6,7 +6,8 @@
  */
 
 import * as functions from 'firebase-functions';
-import type { Role } from '../types';
+import * as admin from 'firebase-admin';
+import { type Role, ROLES } from '../types';
 
 export interface AuthContext {
   uid: string;
@@ -31,8 +32,12 @@ export function assertAuth(context: functions.https.CallableContext): { uid: str
  */
 export function assertRole(context: functions.https.CallableContext, roles: Role[]): AuthContext {
   const auth = assertAuth(context);
-  const role = auth.token['role'] as Role | undefined;
-  if (!role || !roles.includes(role)) {
+  const rawRole = auth.token['role'] as string | undefined;
+  if (!rawRole || !ROLES.includes(rawRole as Role)) {
+    throw new functions.https.HttpsError('permission-denied', `Requires role: ${roles.join(' | ')}`);
+  }
+  const role = rawRole as Role;
+  if (!roles.includes(role)) {
     throw new functions.https.HttpsError('permission-denied', `Requires role: ${roles.join(' | ')}`);
   }
   const companyId = auth.token['companyId'] as string | undefined;
@@ -54,5 +59,4 @@ export function getCompanyId(context: functions.https.CallableContext): string {
   return companyId;
 }
 
-// Need admin import for DecodedIdToken type
-import * as admin from 'firebase-admin';
+

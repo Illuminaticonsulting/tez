@@ -114,8 +114,8 @@ export class AuthService {
           });
         }
       }
-    } catch {
-      console.error('[Tez] Failed to load user profile');
+    } catch (err) {
+      console.error('[Tez] Failed to load user profile:', err);
     }
   }
 }

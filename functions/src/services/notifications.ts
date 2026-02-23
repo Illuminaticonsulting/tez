@@ -212,6 +212,17 @@ export async function sendEmail(
   }
 }
 
+// ─── HTML Escaping (XSS Prevention) ──────────────────────────────────
+
+function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 // ─── Email Templates ─────────────────────────────────────────────────
 
 const emailHeader = (companyName: string) => `
@@ -273,17 +284,17 @@ export function buildBookingConfirmationEmail(
 ): string {
   return `${emailHeader(companyName)}
       <h2 style="margin: 0 0 8px; color: #333;">Booking Confirmed! ✅</h2>
-      <p style="color: #666; margin: 0 0 24px;">Hi ${customerName}, your valet parking has been confirmed.</p>
+      <p style="color: #666; margin: 0 0 24px;">Hi ${escapeHtml(customerName)}, your valet parking has been confirmed.</p>
 
       <div style="text-align: center; margin: 24px 0;">
         <span class="ticket-badge">Ticket #${ticketNumber}</span>
       </div>
 
       <table class="info-table">
-        <tr><td>Customer</td><td>${customerName}</td></tr>
-        <tr><td>Vehicle</td><td>${vehicle}</td></tr>
-        <tr><td>License Plate</td><td>${plate}</td></tr>
-        ${flightNumber ? `<tr><td>Flight</td><td>${flightNumber}</td></tr>` : ''}
+        <tr><td>Customer</td><td>${escapeHtml(customerName)}</td></tr>
+        <tr><td>Vehicle</td><td>${escapeHtml(vehicle)}</td></tr>
+        <tr><td>License Plate</td><td>${escapeHtml(plate)}</td></tr>
+        ${flightNumber ? `<tr><td>Flight</td><td>${escapeHtml(flightNumber)}</td></tr>` : ''}
         <tr><td>Status</td><td><span class="status-pill status-new">New</span></td></tr>
       </table>
 
@@ -308,16 +319,16 @@ export function buildCompletionReceiptEmail(
   const currencySymbol = currency === 'USD' ? '$' : currency;
   return `${emailHeader(companyName)}
       <h2 style="margin: 0 0 8px; color: #333;">Thank You! 🎉</h2>
-      <p style="color: #666; margin: 0 0 24px;">Hi ${customerName}, your valet parking service has been completed.</p>
+      <p style="color: #666; margin: 0 0 24px;">Hi ${escapeHtml(customerName)}, your valet parking service has been completed.</p>
 
       <div class="receipt-box">
         <p style="color: #888; font-size: 13px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 1px;">Receipt</p>
         <p class="receipt-total">${currencySymbol}${paymentAmount.toFixed(2)}</p>
         <table class="info-table" style="margin-bottom: 0;">
           <tr><td>Ticket</td><td>#${ticketNumber}</td></tr>
-          <tr><td>Vehicle</td><td>${vehicle} (${plate})</td></tr>
-          <tr><td>Duration</td><td>${duration}</td></tr>
-          <tr><td>Payment</td><td>${paymentMethod}</td></tr>
+          <tr><td>Vehicle</td><td>${escapeHtml(vehicle)} (${escapeHtml(plate)})</td></tr>
+          <tr><td>Duration</td><td>${escapeHtml(duration)}</td></tr>
+          <tr><td>Payment</td><td>${escapeHtml(paymentMethod)}</td></tr>
           <tr><td>Status</td><td><span class="status-pill status-completed">Completed</span></td></tr>
         </table>
       </div>
@@ -337,12 +348,12 @@ export function buildCancellationEmail(
 ): string {
   return `${emailHeader(companyName)}
       <h2 style="margin: 0 0 8px; color: #333;">Booking Cancelled</h2>
-      <p style="color: #666; margin: 0 0 24px;">Hi ${customerName}, your booking has been cancelled.</p>
+      <p style="color: #666; margin: 0 0 24px;">Hi ${escapeHtml(customerName)}, your booking has been cancelled.</p>
 
       <table class="info-table">
         <tr><td>Ticket</td><td>#${ticketNumber}</td></tr>
-        <tr><td>License Plate</td><td>${plate}</td></tr>
-        ${reason ? `<tr><td>Reason</td><td>${reason}</td></tr>` : ''}
+        <tr><td>License Plate</td><td>${escapeHtml(plate)}</td></tr>
+        ${reason ? `<tr><td>Reason</td><td>${escapeHtml(reason)}</td></tr>` : ''}
         <tr><td>Status</td><td><span class="status-pill status-cancelled">Cancelled</span></td></tr>
       </table>
 

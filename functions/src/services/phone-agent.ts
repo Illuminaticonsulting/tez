@@ -343,7 +343,7 @@ async function lookupBooking(companyId: string, args: Record<string, unknown>) {
     vehicleDescription: [data.vehicle?.color, data.vehicle?.make, data.vehicle?.model]
       .filter(Boolean)
       .join(' '),
-    spot: data.spot?.label || 'Not assigned yet',
+    spot: data.spotName || data.spot?.label || 'Not assigned yet',
     hasKeys: data.keysHandedOver ? 'Yes' : 'No',
     flightNumber: data.flightNumber || 'None',
     createdAt: data.createdAt?.toDate?.()?.toISOString() || 'Unknown',
@@ -387,7 +387,7 @@ async function requestVehicle(companyId: string, bookingId: string) {
   return {
     success: true,
     message: 'Done! Your car is being brought to the pickup area now. It should be ready shortly.',
-    spotLabel: data.spot?.label,
+    spotLabel: data.spotName || data.spot?.label,
   };
 }
 
@@ -403,9 +403,11 @@ async function cancelBookingByPhone(companyId: string, bookingId: string, reason
   }
 
   // Release spot if assigned
-  if (data.spot?.id && data.spot?.locationId) {
+  const spotId = data.spotId || data.spot?.id;
+  const spotLocId = data.locationId || data.spot?.locationId;
+  if (spotId && spotLocId) {
     const spotDocRef = db.doc(
-      `companies/${companyId}/locations/${data.spot.locationId}/spots/${data.spot.id}`
+      `companies/${companyId}/locations/${spotLocId}/spots/${spotId}`
     );
     await spotDocRef.update({
       status: 'available',
@@ -548,7 +550,7 @@ async function processWithAI(
  *   ?action=status    — Call status update
  */
 export const phoneWebhook = functions
-  .runWith({ ...HEAVY_OPTIONS, memory: '512MB' })
+  .runWith(HEAVY_OPTIONS)
   .https.onRequest(async (req, res) => {
     const action = (req.query.action as string) || 'incoming';
 
@@ -564,6 +566,7 @@ export const phoneWebhook = functions
           return await handleStatus(req, res);
         default:
           res.status(400).send(twimlSay('Invalid request.'));
+          return;
       }
     } catch (err) {
       logError({ correlationId: 'phone-webhook', operation: 'phoneWebhook' }, 'Webhook error', err as Error);

@@ -123,13 +123,19 @@ export const cleanupFlightCache = functions
 
     if (expiredSnap.empty) return;
 
-    const batch = db.batch();
+    const batches: admin.firestore.WriteBatch[] = [];
+    let currentBatch = db.batch();
     let count = 0;
     for (const doc of expiredSnap.docs) {
-      batch.delete(doc.ref);
+      currentBatch.delete(doc.ref);
       count++;
+      if (count % 500 === 0) {
+        batches.push(currentBatch);
+        currentBatch = db.batch();
+      }
     }
-    await batch.commit();
+    batches.push(currentBatch);
+    await Promise.all(batches.map((b) => b.commit()));
     functions.logger.info(`Cleaned ${count} expired flight cache entries`);
   });
 
@@ -154,20 +160,39 @@ export const dailyStatsRollup = functions
 
       const dayStats = statsDoc.data()!;
 
-      // Roll up into monthly summary
-      await companyDoc.ref
-        .collection('stats')
-        .doc(`monthly_${monthStr}`)
-        .set(
+      // Idempotency: check if this day was already rolled up
+      if (dayStats['rolledUp'] === true) {
+        functions.logger.info(`Skipping already rolled-up day ${dateStr} for company ${companyDoc.id}`);
+        continue;
+      }
+
+      // Roll up into monthly summary + mark day as rolled up atomically
+      const monthlyRef = companyDoc.ref.collection('stats').doc(`monthly_${monthStr}`);
+      const dayRef = companyDoc.ref.collection('stats').doc(dateStr);
+
+      await db.runTransaction(async (tx) => {
+        // Re-check inside transaction for safety
+        const freshDay = await tx.get(dayRef);
+        if (!freshDay.exists || freshDay.data()?.['rolledUp'] === true) return;
+
+        const fresh = freshDay.data()!;
+        const monthlyDoc = await tx.get(monthlyRef);
+        const existing = monthlyDoc.exists ? monthlyDoc.data()! : {};
+
+        tx.set(
+          monthlyRef,
           {
-            completedCount: admin.firestore.FieldValue.increment(dayStats['completedCount'] || 0),
-            totalRevenue: admin.firestore.FieldValue.increment(dayStats['totalRevenue'] || 0),
-            newBookingCount: admin.firestore.FieldValue.increment(dayStats['newBookingCount'] || 0),
-            daysIncluded: admin.firestore.FieldValue.increment(1),
+            completedCount: (existing['completedCount'] || 0) + (fresh['completedCount'] || 0),
+            totalRevenue: (existing['totalRevenue'] || 0) + (fresh['totalRevenue'] || 0),
+            newBookingCount: (existing['newBookingCount'] || 0) + (fresh['newBookingCount'] || 0),
+            daysIncluded: (existing['daysIncluded'] || 0) + 1,
             lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
           },
           { merge: true },
         );
+
+        tx.update(dayRef, { rolledUp: true });
+      });
     }
 
     functions.logger.info(`Daily stats rollup completed for ${dateStr}`);

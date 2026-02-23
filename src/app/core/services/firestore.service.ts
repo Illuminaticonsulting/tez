@@ -57,6 +57,8 @@ export class FirestoreService {
         ...d.data(),
       } as unknown as T));
       callback(docs);
+    }, (error) => {
+      console.error('[Tez] Firestore listener error:', error);
     });
   }
 
