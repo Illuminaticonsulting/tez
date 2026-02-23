@@ -152,6 +152,7 @@ export class BookingService implements OnDestroy {
   async createBooking(data: {
     customerName: string;
     customerPhone?: string;
+    customerEmail?: string;
     vehicleMake?: string;
     vehicleModel?: string;
     vehicleColor?: string;

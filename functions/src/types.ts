@@ -52,6 +52,7 @@ const flightNum = z
 export const CreateBookingSchema = z.object({
   customerName: safeString(100).refine((s) => s.length > 0, 'customerName is required'),
   customerPhone: phone.optional().default(''),
+  customerEmail: z.string().email().max(254).optional().default(''),
   vehiclePlate: plate.refine((s) => s.length > 0, 'vehiclePlate is required'),
   vehicleMake: safeString(50).optional().default(''),
   vehicleModel: safeString(50).optional().default(''),

@@ -63,6 +63,13 @@ export const TABS_ROUTES: Routes = [
           ),
       },
       {
+        path: 'notification-settings',
+        loadComponent: () =>
+          import('../settings/notification-settings/notification-settings.component').then(
+            (m) => m.NotificationSettingsComponent
+          ),
+      },
+      {
         path: '',
         redirectTo: 'issued',
         pathMatch: 'full',

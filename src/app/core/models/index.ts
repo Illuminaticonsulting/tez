@@ -129,6 +129,7 @@ export interface Company {
 export interface CompanySettings {
   autoSendPaymentLink: boolean;
   autoSendSms: boolean;
+  autoSendEmail: boolean;
   enableFlightTracking: boolean;
   maxActiveTickets: number;
   spotLockTtlSeconds: number; // default 30

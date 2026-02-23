@@ -29,6 +29,7 @@ import {
   saveIdempotency,
   generateCorrelationId,
   logInfo,
+  logError,
   writeAuditLog,
 } from '../middleware';
 import {
@@ -43,6 +44,10 @@ import {
   type ListBookingsResponse,
   type SuccessResponse,
 } from '../types';
+import {
+  notifyBookingCreated,
+  type BookingNotifyData,
+} from './notifications';
 
 // ─── Create Booking ──────────────────────────────────────────────────
 
@@ -86,6 +91,7 @@ export const createBooking = functions
       status: 'New' as BookingStatus,
       customerName: input.customerName,
       customerPhone: input.customerPhone,
+      customerEmail: input.customerEmail,
       vehicle: {
         make: input.vehicleMake,
         model: input.vehicleModel,
@@ -135,6 +141,23 @@ export const createBooking = functions
     });
 
     logInfo(ctx, 'Booking created', { bookingId: docRef.id, ticketNumber });
+
+    // Send SMS + email confirmation (non-blocking)
+    const notifyData: BookingNotifyData = {
+      companyId: auth.companyId,
+      ticketNumber,
+      customerName: input.customerName,
+      customerPhone: input.customerPhone,
+      customerEmail: input.customerEmail,
+      vehiclePlate: input.vehiclePlate,
+      vehicleDescription: [input.vehicleColor, input.vehicleMake, input.vehicleModel].filter(Boolean).join(' '),
+      flightNumber: input.flightNumber,
+      bookingId: docRef.id,
+    };
+    notifyBookingCreated(notifyData).catch((err) => {
+      logError(ctx, 'Failed to send booking confirmation notifications', err);
+    });
+
     return result;
   });
 

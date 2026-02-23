@@ -108,11 +108,11 @@ import {
                 <p>Add operators, set roles</p>
               </ion-label>
             </ion-item>
-            <ion-item button detail>
+            <ion-item button detail routerLink="/tabs/notification-settings">
               <ion-icon name="chatbox-outline" slot="start" aria-hidden="true" color="warning"></ion-icon>
               <ion-label>
-                <h3>SMS Templates</h3>
-                <p>Configure exit messages</p>
+                <h3>SMS & Email Settings</h3>
+                <p>Templates, notifications, receipts</p>
               </ion-label>
             </ion-item>
             <ion-item button detail>

@@ -2,11 +2,57 @@
  * Tez — Firestore Triggers
  *
  * Reactive functions that fire on document events.
- * - New booking notification
- * - Booking status change analytics
+ * - New booking: in-app notification + daily stats
+ * - Status change: in-app notification + SMS/email at every journey stage
+ *
+ * Customer Journey SMS/Email Matrix:
+ *   New        → (handled by createBooking callable directly)
+ *   Check-In   → SMS "vehicle checked in"
+ *   Parked     → SMS "vehicle parked safely"
+ *   Active     → SMS "vehicle on its way!"
+ *   Completed  → SMS + Email receipt
+ *   Cancelled  → SMS + Email cancellation
  */
 
 import { functions, admin, db } from '../config';
+import {
+  notifyCheckIn,
+  notifyParked,
+  notifyVehicleReady,
+  notifyCompleted,
+  notifyCancelled,
+  type BookingNotifyData,
+} from '../services/notifications';
+
+// ─── Helper: Build BookingNotifyData from Firestore doc ──────────────
+
+function buildNotifyData(
+  companyId: string,
+  bookingId: string,
+  data: FirebaseFirestore.DocumentData,
+): BookingNotifyData {
+  return {
+    companyId,
+    bookingId,
+    ticketNumber: data['ticketNumber'] || 0,
+    customerName: data['customerName'] || '',
+    customerPhone: data['customerPhone'] || '',
+    customerEmail: data['customerEmail'] || '',
+    vehiclePlate: data['vehicle']?.['plate'] || '',
+    vehicleDescription: [
+      data['vehicle']?.['color'],
+      data['vehicle']?.['make'],
+      data['vehicle']?.['model'],
+    ].filter(Boolean).join(' '),
+    flightNumber: data['flightNumber'] || '',
+    spotName: data['spotName'] || '',
+    paymentAmount: data['payment']?.['amount'] || 0,
+    paymentMethod: data['payment']?.['method'] || 'cash',
+    cancellationReason: '',
+    createdAt: data['createdAt']?.toDate?.()?.toISOString() || '',
+    completedAt: data['completedAt']?.toDate?.()?.toISOString() || '',
+  };
+}
 
 // ─── Notify on New Booking ───────────────────────────────────────────
 
@@ -28,7 +74,6 @@ export const onBookingCreated = functions.firestore
         bookingId,
         read: false,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        // Auto-expire after 30 days
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
 
@@ -50,7 +95,7 @@ export const onBookingCreated = functions.firestore
     functions.logger.info('Booking created notification sent', { companyId, bookingId, ticketNumber: data['ticketNumber'] });
   });
 
-// ─── Track Status Changes ───────────────────────────────────────────
+// ─── Track Status Changes + Customer Notifications ──────────────────
 
 export const onBookingUpdated = functions.firestore
   .document('companies/{companyId}/bookings/{bookingId}')
@@ -67,8 +112,9 @@ export const onBookingUpdated = functions.firestore
 
     functions.logger.info('Booking status changed', { companyId, bookingId, oldStatus, newStatus });
 
-    // Send notification for important transitions
-    const notifyStatuses = ['Active', 'Completed', 'Cancelled'];
+    // ── In-app notifications (for operators) ─────────────────────
+
+    const notifyStatuses = ['Check-In', 'Parked', 'Active', 'Completed', 'Cancelled'];
     if (notifyStatuses.includes(newStatus)) {
       await db
         .collection('companies')
@@ -83,5 +129,41 @@ export const onBookingUpdated = functions.firestore
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         });
+    }
+
+    // ── Customer SMS/Email (non-blocking) ────────────────────────
+
+    const notifyData = buildNotifyData(companyId, bookingId, after);
+
+    try {
+      switch (newStatus) {
+        case 'Check-In':
+          await notifyCheckIn(notifyData);
+          break;
+
+        case 'Parked':
+          await notifyParked(notifyData);
+          break;
+
+        case 'Active':
+          await notifyVehicleReady(notifyData);
+          break;
+
+        case 'Completed':
+          await notifyCompleted(notifyData);
+          break;
+
+        case 'Cancelled': {
+          // Extract reason from latest history entry
+          const history = after['history'] as Array<{ note?: string }> | undefined;
+          const lastEntry = history?.[history.length - 1];
+          notifyData.cancellationReason = lastEntry?.note || '';
+          await notifyCancelled(notifyData);
+          break;
+        }
+      }
+    } catch (err) {
+      // Never let notification failures break the trigger
+      functions.logger.error('Customer notification failed', { companyId, bookingId, newStatus, error: err });
     }
   });

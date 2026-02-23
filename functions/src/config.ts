@@ -24,6 +24,16 @@ export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
 export const SQUARE_WEBHOOK_SECRET = process.env.SQUARE_WEBHOOK_SECRET || '';
 export const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 
+// Twilio SMS
+export const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || '';
+export const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || '';
+export const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || '';
+
+// SendGrid Email
+export const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY || '';
+export const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || 'noreply@tezparking.com';
+export const SENDGRID_FROM_NAME = process.env.SENDGRID_FROM_NAME || 'Tez Valet Parking';
+
 // ─── Constants ───────────────────────────────────────────────────────
 
 export const APP_VERSION = '2.0.0';

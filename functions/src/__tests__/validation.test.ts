@@ -65,6 +65,33 @@ describe('validate()', () => {
       expect(result.idempotencyKey).toBe('unique-key-123');
     });
 
+    it('should accept valid customerEmail', () => {
+      const result = validate(CreateBookingSchema, {
+        customerName: 'Test',
+        vehiclePlate: 'XYZ',
+        customerEmail: 'test@example.com',
+      });
+      expect(result.customerEmail).toBe('test@example.com');
+    });
+
+    it('should reject invalid customerEmail', () => {
+      expect(() =>
+        validate(CreateBookingSchema, {
+          customerName: 'Test',
+          vehiclePlate: 'XYZ',
+          customerEmail: 'not-an-email',
+        }),
+      ).toThrow('Validation failed');
+    });
+
+    it('should default customerEmail to empty string', () => {
+      const result = validate(CreateBookingSchema, {
+        customerName: 'Test',
+        vehiclePlate: 'XYZ',
+      });
+      expect(result.customerEmail).toBe('');
+    });
+
     it('should handle null/undefined data', () => {
       expect(() => validate(CreateBookingSchema, null)).toThrow('Validation failed');
       expect(() => validate(CreateBookingSchema, undefined)).toThrow('Validation failed');

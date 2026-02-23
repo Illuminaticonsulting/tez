@@ -468,6 +468,7 @@ function noAuth() {
 const VALID_BOOKING_DATA = {
   customerName: 'John Doe',
   customerPhone: '555-1234',
+  customerEmail: 'john@example.com',
   vehiclePlate: 'ABC123',
   vehicleMake: 'Toyota',
   vehicleModel: 'Camry',
@@ -544,6 +545,7 @@ describe('createBooking handler', () => {
     const [, bookingData] = bookingEntries[0];
     expect(bookingData.status).toBe('New');
     expect(bookingData.customerName).toBeDefined();
+    expect(bookingData.customerEmail).toBe('john@example.com');
   });
 
   it('should write audit log', async () => {
