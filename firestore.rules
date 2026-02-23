@@ -90,6 +90,17 @@ service cloud.firestore {
       match /_idempotency/{keyId} {
         allow read, write: if false;
       }
+
+      // ── Call Sessions (AI Phone Agent, internal) ───────────
+      match /_callSessions/{sessionId} {
+        allow read, write: if false;
+      }
+
+      // ── Call Log (AI Phone Agent) ──────────────────────────
+      match /_callLog/{logId} {
+        allow read: if isAdmin(companyId);
+        allow write: if false;
+      }
     }
 
     // ── System Collections (Cloud Functions only) ────────────
@@ -98,6 +109,10 @@ service cloud.firestore {
     }
 
     match /_flightCache/{docId} {
+      allow read, write: if false;
+    }
+
+    match /_phoneRouting/{docId} {
       allow read, write: if false;
     }
 

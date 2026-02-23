@@ -44,6 +44,7 @@
  * #20 Sharded booking counter (5 shards)
  * #21 Flight data caching (5-min Firestore TTL)
  * #22 tsconfig strict + noUncheckedIndexedAccess
+ * #23 AI Phone Agent (OpenAI GPT-4o-mini + Twilio Voice)
  */
 
 // ─── Callable Functions ──────────────────────────────────────────────
@@ -69,6 +70,13 @@ export {
   healthCheck,
   processPaymentWebhook,
 } from './services/admin';
+
+export {
+  phoneWebhook,
+  savePhoneConfig,
+  getCallLog,
+  cleanupCallSessions,
+} from './services/phone-agent';
 
 // ─── Firestore Triggers ──────────────────────────────────────────────
 

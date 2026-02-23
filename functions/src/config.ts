@@ -22,6 +22,7 @@ export const FLIGHTSTATS_APP_ID = functions.config().flightstats?.app_id || proc
 export const FLIGHTSTATS_APP_KEY = functions.config().flightstats?.app_key || process.env.FLIGHTSTATS_APP_KEY || '';
 export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
 export const SQUARE_WEBHOOK_SECRET = process.env.SQUARE_WEBHOOK_SECRET || '';
+export const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -84,6 +85,18 @@ export function idempotencyRef(companyId: string, key: string) {
 
 export function flightCacheRef(flightKey: string) {
   return db.collection('_flightCache').doc(flightKey);
+}
+
+export function phoneRoutingRef() {
+  return db.collection('_phoneRouting');
+}
+
+export function callLogRef(companyId: string) {
+  return db.collection('companies').doc(companyId).collection('_callLog');
+}
+
+export function callSessionRef(companyId: string, callSid: string) {
+  return db.collection('companies').doc(companyId).collection('_callSessions').doc(callSid);
 }
 
 export { admin, functions };

@@ -56,6 +56,13 @@ export const TABS_ROUTES: Routes = [
           ),
       },
       {
+        path: 'phone-settings',
+        loadComponent: () =>
+          import('../settings/phone-settings/phone-settings.component').then(
+            (m) => m.PhoneSettingsComponent
+          ),
+      },
+      {
         path: '',
         redirectTo: 'issued',
         pathMatch: 'full',

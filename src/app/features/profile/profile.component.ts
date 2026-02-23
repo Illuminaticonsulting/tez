@@ -11,7 +11,7 @@ import { AuthService, UiService } from '../../core/services';
 import { addIcons } from 'ionicons';
 import {
   logOutOutline, moonOutline, notificationsOutline, shieldOutline,
-  analyticsOutline, chatboxOutline, settingsOutline,
+  analyticsOutline, chatboxOutline, settingsOutline, callOutline,
 } from 'ionicons/icons';
 
 @Component({
@@ -92,6 +92,13 @@ import {
               <ion-label>
                 <h3>Reports & Analytics</h3>
                 <p>Revenue, performance, trends</p>
+              </ion-label>
+            </ion-item>
+            <ion-item button detail routerLink="/tabs/phone-settings">
+              <ion-icon name="call-outline" slot="start" aria-hidden="true" color="warning"></ion-icon>
+              <ion-label>
+                <h3>AI Phone Agent</h3>
+                <p>Automated call handling, logs</p>
               </ion-label>
             </ion-item>
             <ion-item button detail>
@@ -196,7 +203,7 @@ export class ProfileComponent {
   darkMode = false;
 
   constructor() {
-    addIcons({ logOutOutline, moonOutline, notificationsOutline, shieldOutline, analyticsOutline, chatboxOutline, settingsOutline });
+    addIcons({ logOutOutline, moonOutline, notificationsOutline, shieldOutline, analyticsOutline, chatboxOutline, settingsOutline, callOutline });
     // #35 fix — persist dark mode from localStorage
     this.darkMode = localStorage.getItem('tez_dark_mode') === 'true';
     if (this.darkMode) {
