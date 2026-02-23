@@ -1,4 +1,5 @@
-import { Component, inject, signal, computed, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, ChangeDetectionStrategy, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
@@ -13,7 +14,7 @@ import {
   createOutline,
 } from 'ionicons/icons';
 import { Booking } from '../../../core/models';
-import { BookingService, UiService } from '../../../core/services';
+import { BookingService, UiService, FirestoreService, AuthService } from '../../../core/services';
 import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
 import { RelativeTimePipe, FormatDatePipe } from '../../../shared/pipes/date.pipes';
 
@@ -218,6 +219,9 @@ export class BookingDetailComponent implements OnInit {
   private router = inject(Router);
   private bookingSvc = inject(BookingService);
   private ui = inject(UiService);
+  private db = inject(FirestoreService);
+  private auth = inject(AuthService);
+  private destroyRef = inject(DestroyRef);
 
   readonly booking = signal<Booking | null>(null);
 
@@ -242,10 +246,21 @@ export class BookingDetailComponent implements OnInit {
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) { this.router.navigateByUrl('/tabs/issued'); return; }
 
-    // Find in already-loaded bookings
+    // First try in-memory bookings
     const all = this.bookingSvc.allBookings();
     const found = all.find(b => b.id === id);
     if (found) { this.booking.set(found); }
+
+    // Subscribe to real-time updates from Firestore
+    const companyId = this.auth.companyId();
+    if (companyId) {
+      this.db.getDocument<Booking>(`companies/${companyId}/bookings/${id}`)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (b) => { if (b) this.booking.set(b); },
+          error: () => { /* handled by in-memory fallback */ },
+        });
+    }
   }
 
   async onAction(action: string): Promise<void> {

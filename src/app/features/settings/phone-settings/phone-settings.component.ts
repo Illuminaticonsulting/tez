@@ -8,7 +8,7 @@ import {
   IonCardContent, IonBadge,
   IonSpinner, IonChip, IonAccordionGroup, IonAccordion,
 } from '@ionic/angular/standalone';
-import { AuthService, ApiService, UiService } from '../../../core/services';
+import { AuthService, ApiService, UiService, FirestoreService } from '../../../core/services';
 import { addIcons } from 'ionicons';
 import {
   callOutline, settingsOutline, saveOutline, refreshOutline,
@@ -479,6 +479,7 @@ export class PhoneSettingsComponent implements OnInit {
   private auth = inject(AuthService);
   private api = inject(ApiService);
   private ui = inject(UiService);
+  private db = inject(FirestoreService);
 
   saving = signal(false);
   loadingLogs = signal(false);
@@ -517,14 +518,28 @@ export class PhoneSettingsComponent implements OnInit {
 
   async loadConfig(): Promise<void> {
     try {
-      // Load from Firestore directly via the company meta doc
       const companyId = this.auth.companyId();
       if (!companyId) return;
 
-      // We'll use ApiService to get config, or load defaults
-      // For now, config starts with defaults; it's persisted on save
+      const doc$ = this.db.getDocument<PhoneConfig>(`companies/${companyId}/meta/phoneAgent`);
+      const { firstValueFrom, timeout, catchError, of } = await import('rxjs');
+      const saved = await firstValueFrom(
+        doc$.pipe(timeout(5000), catchError(() => of(null)))
+      );
+      if (saved) {
+        this.config = {
+          enabled: saved.enabled ?? false,
+          twilioPhoneNumber: saved.twilioPhoneNumber ?? '',
+          transferNumber: saved.transferNumber ?? '',
+          greeting: saved.greeting ?? '',
+          businessHours: saved.businessHours ?? '',
+          pricingInfo: saved.pricingInfo ?? '',
+          locationInfo: saved.locationInfo ?? '',
+        };
+        this.originalConfig = JSON.stringify(this.config);
+      }
     } catch {
-      // Use defaults
+      // Use defaults on error
     }
   }
 

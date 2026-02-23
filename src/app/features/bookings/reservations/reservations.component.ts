@@ -103,7 +103,12 @@ export class ReservationsComponent {
     } else if (event.action === 'cancel') {
       const ok = await this.ui.confirm('Cancel', `Cancel reservation #${event.booking.ticketNumber}?`);
       if (!ok) return;
-      await this.bookingSvc.cancelBooking(event.booking.id, 'Cancelled by operator');
+      try {
+        await this.bookingSvc.cancelBooking(event.booking.id, 'Cancelled by operator');
+        this.ui.toast('Reservation cancelled');
+      } catch {
+        this.ui.toast('Failed to cancel reservation', 'danger');
+      }
     }
   }
 

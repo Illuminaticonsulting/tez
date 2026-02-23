@@ -8,6 +8,4 @@ export const environment = {
     messagingSenderId: '000000000000',
     appId: '1:000000000000:web:000000000000',
   },
-  functionsUrl: 'https://us-central1-your-prod-project.cloudfunctions.net',
-  flightApiProxy: 'https://us-central1-your-prod-project.cloudfunctions.net/flightProxy',
 };

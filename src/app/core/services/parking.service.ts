@@ -1,6 +1,6 @@
 import { Injectable, inject, signal, computed, OnDestroy } from '@angular/core';
 import { orderBy } from '@angular/fire/firestore';
-import { ParkingSpot, ParkingLocation } from '../models';
+import { ParkingSpot, ParkingLocation, enrichSpot } from '../models';
 import { FirestoreService } from './firestore.service';
 import { AuthService } from './auth.service';
 import { ApiService } from './api.service';
@@ -90,7 +90,7 @@ export class ParkingService implements OnDestroy {
         (locSpots) => {
           // Merge with existing spots from other locations
           const existing = this.spots().filter((s) => s.locationId !== loc.id);
-          const withLocId = locSpots.map((s) => ({ ...s, locationId: loc.id }));
+          const withLocId = locSpots.map((s) => enrichSpot({ ...s, locationId: loc.id }));
           this.spots.set([...existing, ...withLocId]);
         }
       );

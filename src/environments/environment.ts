@@ -8,6 +8,4 @@ export const environment = {
     messagingSenderId: '000000000000',
     appId: '1:000000000000:web:000000000000',
   },
-  functionsUrl: 'http://localhost:5001/your-dev-project/us-central1',
-  flightApiProxy: 'http://localhost:5001/your-dev-project/us-central1/flightProxy',
 };

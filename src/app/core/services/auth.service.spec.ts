@@ -1,23 +1,30 @@
 import { TestBed } from '@angular/core/testing';
 import { AuthService } from './auth.service';
 import { Auth } from '@angular/fire/auth';
-import { Firestore } from '@angular/fire/firestore';
+import { Router } from '@angular/router';
+import { FirestoreService } from './firestore.service';
 
 describe('AuthService', () => {
   let service: AuthService;
 
   const mockAuth = {
-    onAuthStateChanged: jest.fn((cb: (u: any) => void) => { cb(null); return () => {}; }),
+    onAuthStateChanged: (auth: any, cb: (u: any) => void) => { cb(null); return () => {}; },
     currentUser: null,
   };
-  const mockFirestore = {};
+  const mockRouter = {
+    navigateByUrl: jasmine.createSpy('navigateByUrl'),
+  };
+  const mockFirestore = {
+    getDocument: jasmine.createSpy('getDocument'),
+  };
 
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [
         AuthService,
         { provide: Auth, useValue: mockAuth },
-        { provide: Firestore, useValue: mockFirestore },
+        { provide: Router, useValue: mockRouter },
+        { provide: FirestoreService, useValue: mockFirestore },
       ],
     });
     service = TestBed.inject(AuthService);
@@ -29,5 +36,13 @@ describe('AuthService', () => {
 
   it('should not be authenticated initially', () => {
     expect(service.isAuthenticated()).toBe(false);
+  });
+
+  it('should have viewer as default role', () => {
+    expect(service.userRole()).toBe('viewer');
+  });
+
+  it('should have empty companyId initially', () => {
+    expect(service.companyId()).toBe('');
   });
 });

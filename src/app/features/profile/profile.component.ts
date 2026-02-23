@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, computed, ChangeDetectionStrategy, afterNextRender } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -7,7 +7,7 @@ import {
   IonButton, IonIcon, IonList, IonItem, IonLabel,
   IonToggle,
 } from '@ionic/angular/standalone';
-import { AuthService, UiService } from '../../core/services';
+import { AuthService, UiService, BookingService } from '../../core/services';
 import { addIcons } from 'ionicons';
 import {
   logOutOutline, moonOutline, notificationsOutline, shieldOutline,
@@ -45,18 +45,18 @@ import {
       <!-- Quick Stats -->
       <div class="quick-stats">
         <div class="stat-item">
-          <span class="stat-value">—</span>
+          <span class="stat-value">{{ todayCount() }}</span>
           <span class="stat-label">Today</span>
         </div>
         <div class="stat-divider"></div>
         <div class="stat-item">
-          <span class="stat-value">—</span>
+          <span class="stat-value">{{ weekCount() }}</span>
           <span class="stat-label">This Week</span>
         </div>
         <div class="stat-divider"></div>
         <div class="stat-item">
-          <span class="stat-value">—</span>
-          <span class="stat-label">Rating</span>
+          <span class="stat-value">{{ totalActive() }}</span>
+          <span class="stat-label">Active</span>
         </div>
       </div>
 
@@ -134,7 +134,7 @@ import {
         </ion-button>
       </div>
 
-      <div class="version">Tez v1.0.0 — Built with ❤️</div>
+      <div class="version">Tez v2.0.0 — Built with ❤️</div>
     </ion-content>
   `,
   styles: [`
@@ -198,17 +198,20 @@ import {
 export class ProfileComponent {
   readonly auth = inject(AuthService);
   private ui = inject(UiService);
+  private bookingSvc = inject(BookingService);
 
   pushEnabled = false;
   darkMode = false;
 
   constructor() {
     addIcons({ logOutOutline, moonOutline, notificationsOutline, shieldOutline, analyticsOutline, chatboxOutline, settingsOutline, callOutline });
-    // #35 fix — persist dark mode from localStorage
-    this.darkMode = localStorage.getItem('tez_dark_mode') === 'true';
-    if (this.darkMode) {
-      document.body.classList.add('dark');
-    }
+    // #35 fix — persist dark mode from localStorage (SSR-safe)
+    afterNextRender(() => {
+      this.darkMode = localStorage.getItem('tez_dark_mode') === 'true';
+      if (this.darkMode) {
+        document.body.classList.add('dark');
+      }
+    });
   }
 
   /** #45 fix — initials as computed signal, not a regular method */
@@ -216,6 +219,27 @@ export class ProfileComponent {
     const name = this.auth.appUser()?.displayName || '';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
   });
+
+  /** Quick stats from booking data */
+  private toDate(val: unknown): Date {
+    if (val instanceof Date) return val;
+    if (val && typeof val === 'object' && 'toDate' in val) return (val as { toDate(): Date }).toDate();
+    return new Date();
+  }
+
+  readonly todayCount = computed(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return this.bookingSvc.allBookings().filter(b => this.toDate(b.createdAt) >= now).length;
+  });
+
+  readonly weekCount = computed(() => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 7);
+    return this.bookingSvc.allBookings().filter(b => this.toDate(b.createdAt) >= cutoff).length;
+  });
+
+  readonly totalActive = computed(() => this.bookingSvc.counts().total);
 
   async onLogout(): Promise<void> {
     const ok = await this.ui.confirm('Sign Out', 'Are you sure you want to sign out?');

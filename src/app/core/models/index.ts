@@ -92,6 +92,17 @@ export interface ParkingSpot {
   row?: string;
   column?: number;
   order?: number;
+
+  /** Computed convenience getter — true when status is 'available' */
+  readonly isAvailable?: boolean;
+}
+
+/** Helper to enrich raw Firestore spot data with computed fields */
+export function enrichSpot(spot: ParkingSpot): ParkingSpot {
+  return Object.defineProperty({ ...spot }, 'isAvailable', {
+    get() { return this.status === 'available'; },
+    enumerable: true,
+  });
 }
 
 // ---- Location ----
@@ -192,7 +203,7 @@ export const VALID_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   'Booked':    ['Check-In', 'Cancelled'],
   'Check-In':  ['Parked', 'Cancelled'],
   'Parked':    ['Active', 'Cancelled'],
-  'Active':    ['Completed'],
+  'Active':    ['Completed', 'Cancelled'],
   'Completed': [],
   'Cancelled': [],
 };
