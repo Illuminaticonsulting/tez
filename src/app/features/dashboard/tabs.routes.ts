@@ -82,6 +82,14 @@ export const TABS_ROUTES: Routes = [
           ),
       },
       {
+        path: 'user-management',
+        canActivate: [roleGuard(['admin'])],
+        loadComponent: () =>
+          import('../settings/user-management/user-management.component').then(
+            (m) => m.UserManagementComponent
+          ),
+      },
+      {
         path: '',
         redirectTo: 'issued',
         pathMatch: 'full',

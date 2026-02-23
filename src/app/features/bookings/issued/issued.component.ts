@@ -8,8 +8,9 @@ import {
 } from '@ionic/angular/standalone';
 import { BookingService, ParkingService, UiService } from '../../../core/services';
 import { BookingCardComponent } from '../booking-card/booking-card.component';
+import { SpotAssignmentComponent } from '../../parking/spot-assignment/spot-assignment.component';
 import { Booking } from '../../../core/models';
-import { SearchbarCustomEvent } from '@ionic/angular';
+import { SearchbarCustomEvent, ModalController } from '@ionic/angular';
 
 @Component({
   selector: 'app-issued',
@@ -123,6 +124,7 @@ export class IssuedComponent {
   private parkingSvc = inject(ParkingService);
   private ui = inject(UiService);
   private router = inject(Router);
+  private modalCtrl = inject(ModalController);
 
   readonly searchTerm = signal('');
 
@@ -165,10 +167,8 @@ export class IssuedComponent {
         break;
       }
       case 'park':
-        this.ui.toast('Open parking spot selector', 'primary');
-        break;
       case 'move':
-        this.ui.toast('Open spot re-assignment', 'primary');
+        await this.openSpotAssignment(booking);
         break;
     }
   }
@@ -179,5 +179,18 @@ export class IssuedComponent {
 
   onRefresh(event: CustomEvent): void {
     setTimeout(() => (event.target as HTMLIonRefresherElement).complete(), 500);
+  }
+
+  private async openSpotAssignment(booking: Booking): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: SpotAssignmentComponent,
+      componentProps: {
+        bookingId: booking.id,
+        ticketNumber: booking.ticketNumber,
+      },
+      presentingElement: document.querySelector('ion-tabs') as HTMLElement ?? undefined,
+      canDismiss: true,
+    });
+    await modal.present();
   }
 }

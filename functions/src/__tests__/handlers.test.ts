@@ -2341,7 +2341,7 @@ describe('RBAC Enforcement Matrix', () => {
 describe('State Machine: Exhaustive Transition Tests', () => {
   const ALL_STATUSES = ['New', 'Booked', 'Check-In', 'Parked', 'Active', 'Completed', 'Cancelled'];
   const VALID: Record<string, string[]> = {
-    New: ['Booked', 'Cancelled'],
+    New: ['Booked', 'Check-In', 'Cancelled'],
     Booked: ['Check-In', 'Cancelled'],
     'Check-In': ['Parked', 'Cancelled'],
     Parked: ['Active', 'Cancelled'],

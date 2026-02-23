@@ -15,8 +15,10 @@ import {
 } from 'ionicons/icons';
 import { Booking } from '../../../core/models';
 import { BookingService, UiService, FirestoreService, AuthService } from '../../../core/services';
+import { SpotAssignmentComponent } from '../../parking/spot-assignment/spot-assignment.component';
 import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
 import { RelativeTimePipe, FormatDatePipe } from '../../../shared/pipes/date.pipes';
+import { ModalController } from '@ionic/angular/standalone';
 
 @Component({
   selector: 'app-booking-detail',
@@ -222,6 +224,7 @@ export class BookingDetailComponent implements OnInit {
   private db = inject(FirestoreService);
   private auth = inject(AuthService);
   private destroyRef = inject(DestroyRef);
+  private modalCtrl = inject(ModalController);
 
   readonly booking = signal<Booking | null>(null);
 
@@ -275,9 +278,18 @@ export class BookingDetailComponent implements OnInit {
         try { await this.bookingSvc.transitionStatus(b.id, 'Check-In'); this.ui.toast('Checked in!'); } catch { this.ui.toast('Failed', 'danger'); } finally { await this.ui.hideLoading(); }
         break;
       }
-      case 'park':
-        this.ui.toast('Open spot selector', 'primary');
+      case 'park': {
+        const modal = await this.modalCtrl.create({
+          component: SpotAssignmentComponent,
+          componentProps: {
+            bookingId: b.id,
+            ticketNumber: b.ticketNumber,
+          },
+          canDismiss: true,
+        });
+        await modal.present();
         break;
+      }
       case 'release': {
         const ok = await this.ui.confirm('Release', `Release ticket #${b.ticketNumber}?`);
         if (!ok) return;

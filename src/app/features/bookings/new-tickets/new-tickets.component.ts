@@ -4,11 +4,15 @@ import { Router } from '@angular/router';
 import {
   IonContent, IonHeader, IonToolbar, IonTitle,
   IonSearchbar, IonRefresher, IonRefresherContent, IonSkeletonText,
+  IonFab, IonFabButton, IonIcon,
 } from '@ionic/angular/standalone';
+import { addIcons } from 'ionicons';
+import { addOutline } from 'ionicons/icons';
 import { BookingService, UiService } from '../../../core/services';
 import { BookingCardComponent } from '../booking-card/booking-card.component';
+import { CreateBookingComponent } from '../create-booking/create-booking.component';
 import { Booking } from '../../../core/models';
-import { SearchbarCustomEvent } from '@ionic/angular';
+import { SearchbarCustomEvent, ModalController } from '@ionic/angular';
 
 @Component({
   selector: 'app-new-tickets',
@@ -17,6 +21,7 @@ import { SearchbarCustomEvent } from '@ionic/angular';
   imports: [
     CommonModule, IonContent, IonHeader, IonToolbar, IonTitle,
     IonSearchbar, IonRefresher, IonRefresherContent, IonSkeletonText,
+    IonFab, IonFabButton, IonIcon,
     BookingCardComponent,
   ],
   template: `
@@ -65,6 +70,13 @@ import { SearchbarCustomEvent } from '@ionic/angular';
           }
         }
       </div>
+
+      <!-- Create Booking FAB -->
+      <ion-fab slot="fixed" vertical="bottom" horizontal="end">
+        <ion-fab-button (click)="openCreateBooking()" aria-label="Create new ticket" color="warning">
+          <ion-icon name="add-outline"></ion-icon>
+        </ion-fab-button>
+      </ion-fab>
     </ion-content>
   `,
   styles: [`
@@ -94,7 +106,12 @@ export class NewTicketsComponent {
   readonly bookingSvc = inject(BookingService);
   private ui = inject(UiService);
   private router = inject(Router);
+  private modalCtrl = inject(ModalController);
   private searchTerm = signal('');
+
+  constructor() {
+    addIcons({ addOutline });
+  }
 
   readonly count = computed(() => this.bookingSvc.groups().new.length);
 
@@ -134,4 +151,13 @@ export class NewTicketsComponent {
 
   onCardClick(booking: Booking): void { this.router.navigate(['/booking', booking.id]); }
   onRefresh(e: CustomEvent): void { setTimeout(() => (e.target as HTMLIonRefresherElement).complete(), 500); }
+
+  async openCreateBooking(): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: CreateBookingComponent,
+      presentingElement: document.querySelector('ion-tabs') as HTMLElement ?? undefined,
+      canDismiss: true,
+    });
+    await modal.present();
+  }
 }

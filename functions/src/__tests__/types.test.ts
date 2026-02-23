@@ -46,6 +46,10 @@ describe('VALID_TRANSITIONS', () => {
     expect(VALID_TRANSITIONS['Active']).toContain('Completed');
   });
 
+  it('should allow New → Check-In for walk-up valet', () => {
+    expect(VALID_TRANSITIONS['New']).toContain('Check-In');
+  });
+
   it('should not allow backward transitions', () => {
     expect(VALID_TRANSITIONS['Active']).not.toContain('Parked');
     expect(VALID_TRANSITIONS['Parked']).not.toContain('Check-In');

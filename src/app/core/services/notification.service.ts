@@ -48,9 +48,9 @@ export class NotificationService {
 
   playAlert(type: 'new-ticket' | 'checkout' | 'error'): void {
     const soundMap: Record<string, string> = {
-      'new-ticket': 'assets/sounds/new-ticket.mp3',
-      checkout: 'assets/sounds/checkout.mp3',
-      error: 'assets/sounds/error.mp3',
+      'new-ticket': 'assets/sounds/new-ticket.wav',
+      checkout: 'assets/sounds/checkout.wav',
+      error: 'assets/sounds/error.wav',
     };
 
     const src = soundMap[type];

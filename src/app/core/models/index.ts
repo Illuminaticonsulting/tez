@@ -200,7 +200,7 @@ export interface BookingGroups {
 
 // ---- Status transition map (aligned with Cloud Functions) ----
 export const VALID_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
-  'New':       ['Booked', 'Cancelled'],
+  'New':       ['Booked', 'Check-In', 'Cancelled'],
   'Booked':    ['Check-In', 'Cancelled'],
   'Check-In':  ['Parked', 'Cancelled'],
   'Parked':    ['Active', 'Cancelled'],

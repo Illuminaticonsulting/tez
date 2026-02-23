@@ -82,7 +82,8 @@ import { AuthService } from '../../../core/services';
           </form>
 
           <div class="login-footer">
-            <p>Powered by <strong>VCR Tech</strong></p>
+            <p>Don't have an account? <a routerLink="/auth/register" class="register-link">Create Account</a></p>
+            <p class="powered-by">Powered by <strong>VCR Tech</strong></p>
           </div>
         </div>
       </div>
@@ -194,6 +195,8 @@ import { AuthService } from '../../../core/services';
       p { margin: 0; }
       strong { color: #888; }
     }
+    .register-link { color: #0f3460; text-decoration: none; font-weight: 700; font-size: 14px; &:hover { text-decoration: underline; } }
+    .powered-by { margin-top: 12px !important; }
   `],
 })
 export class LoginComponent {

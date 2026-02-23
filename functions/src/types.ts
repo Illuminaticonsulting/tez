@@ -13,7 +13,7 @@ export const BOOKING_STATUSES = ['New', 'Booked', 'Check-In', 'Parked', 'Active'
 export type BookingStatus = (typeof BOOKING_STATUSES)[number];
 
 export const VALID_TRANSITIONS: Record<string, BookingStatus[]> = {
-  New: ['Booked', 'Cancelled'],
+  New: ['Booked', 'Check-In', 'Cancelled'],
   Booked: ['Check-In', 'Cancelled'],
   'Check-In': ['Parked', 'Cancelled'],
   Parked: ['Active', 'Cancelled'],

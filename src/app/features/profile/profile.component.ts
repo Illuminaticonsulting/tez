@@ -7,12 +7,12 @@ import {
   IonButton, IonIcon, IonList, IonItem, IonLabel,
   IonToggle,
 } from '@ionic/angular/standalone';
-import { AuthService, UiService, BookingService } from '../../core/services';
+import { AuthService, UiService, BookingService, NotificationService } from '../../core/services';
 import { addIcons } from 'ionicons';
 import {
   logOutOutline, moonOutline, notificationsOutline, shieldOutline,
   analyticsOutline, chatboxOutline, settingsOutline, callOutline,
-  pricetagOutline,
+  pricetagOutline, peopleOutline,
 } from 'ionicons/icons';
 
 @Component({
@@ -116,6 +116,13 @@ import {
                 <p>Templates, notifications, receipts</p>
               </ion-label>
             </ion-item>
+            <ion-item button detail routerLink="/tabs/user-management">
+              <ion-icon name="people-outline" slot="start" aria-hidden="true" color="tertiary"></ion-icon>
+              <ion-label>
+                <h3>User Management</h3>
+                <p>Manage team roles & access</p>
+              </ion-label>
+            </ion-item>
           </ion-list>
         </div>
       }
@@ -192,13 +199,14 @@ import {
 export class ProfileComponent {
   readonly auth = inject(AuthService);
   private ui = inject(UiService);
+  private notify = inject(NotificationService);
   private bookingSvc = inject(BookingService);
 
   pushEnabled = false;
   darkMode = false;
 
   constructor() {
-    addIcons({ logOutOutline, moonOutline, notificationsOutline, shieldOutline, analyticsOutline, chatboxOutline, settingsOutline, callOutline, pricetagOutline });
+    addIcons({ logOutOutline, moonOutline, notificationsOutline, shieldOutline, analyticsOutline, chatboxOutline, settingsOutline, callOutline, pricetagOutline, peopleOutline });
     // #35 fix — persist dark mode from localStorage (SSR-safe)
     afterNextRender(() => {
       this.darkMode = localStorage.getItem('tez_dark_mode') === 'true';
@@ -241,7 +249,19 @@ export class ProfileComponent {
   }
 
   onTogglePush(): void {
-    this.ui.toast(this.pushEnabled ? 'Notifications enabled' : 'Notifications disabled');
+    if (this.pushEnabled) {
+      // Request browser notification permission
+      this.notify.requestPermission().then(granted => {
+        if (granted) {
+          this.ui.toast('Push notifications enabled');
+        } else {
+          this.pushEnabled = false;
+          this.ui.toast('Notification permission denied', 'warning');
+        }
+      });
+    } else {
+      this.ui.toast('Push notifications disabled');
+    }
   }
 
   /** #35 fix — persist dark mode */

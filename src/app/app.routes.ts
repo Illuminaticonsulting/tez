@@ -14,6 +14,14 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'register',
+        canActivate: [noAuthGuard],
+        loadComponent: () =>
+          import('./features/auth/register/register.component').then(
+            (m) => m.RegisterComponent
+          ),
+      },
+      {
         path: 'forgot-password',
         loadComponent: () =>
           import(
