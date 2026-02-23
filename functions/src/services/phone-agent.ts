@@ -55,7 +55,7 @@ export const GetCallLogSchema = z.object({
 
 // ─── Types ───────────────────────────────────────────────────────────
 
-interface PhoneConfig {
+export interface PhoneConfig {
   enabled: boolean;
   twilioPhoneNumber: string;
   transferNumber: string;
@@ -91,8 +91,9 @@ interface CallLogEntry {
 }
 
 // ─── TwiML Helpers ───────────────────────────────────────────────────
+// Exported for testing (@visibleForTesting)
 
-function escapeXml(s: string): string {
+export function escapeXml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -101,19 +102,19 @@ function escapeXml(s: string): string {
     .replace(/'/g, '&apos;');
 }
 
-function twimlGather(text: string, actionUrl: string): string {
+export function twimlGather(text: string, actionUrl: string): string {
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<Response>',
     `  <Gather input="speech" action="${escapeXml(actionUrl)}" method="POST" speechTimeout="${SPEECH_TIMEOUT}" language="en-US">`,
     `    <Say voice="${DEFAULT_VOICE}">${escapeXml(text)}</Say>`,
     '  </Gather>',
-    `  <Say voice="${DEFAULT_VOICE}">I didn't catch that. Please call again if you need help. Goodbye!</Say>`,
+    `  <Say voice="${DEFAULT_VOICE}">${escapeXml("I didn't catch that. Please call again if you need help. Goodbye!")}</Say>`,
     '</Response>',
   ].join('\n');
 }
 
-function twimlSay(text: string): string {
+export function twimlSay(text: string): string {
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<Response>',
@@ -122,7 +123,7 @@ function twimlSay(text: string): string {
   ].join('\n');
 }
 
-function twimlTransfer(text: string, number: string): string {
+export function twimlTransfer(text: string, number: string): string {
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<Response>',
@@ -132,7 +133,7 @@ function twimlTransfer(text: string, number: string): string {
   ].join('\n');
 }
 
-function twimlHangup(text: string): string {
+export function twimlHangup(text: string): string {
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<Response>',
@@ -144,7 +145,7 @@ function twimlHangup(text: string): string {
 
 // ─── OpenAI Tool Definitions ─────────────────────────────────────────
 
-const TOOLS: OpenAI.ChatCompletionTool[] = [
+export const TOOLS: OpenAI.ChatCompletionTool[] = [
   {
     type: 'function' as const,
     function: {
@@ -226,7 +227,7 @@ const TOOLS: OpenAI.ChatCompletionTool[] = [
 
 // ─── System Prompt Builder ───────────────────────────────────────────
 
-function buildSystemPrompt(companyName: string, config: PhoneConfig): string {
+export function buildSystemPrompt(companyName: string, config: PhoneConfig): string {
   return `You are TEZ, an AI phone assistant for ${companyName || 'our'} valet parking service.
 You are professional, warm, and efficient. You speak naturally and concisely since this is a phone conversation.
 
