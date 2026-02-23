@@ -48,6 +48,13 @@ import {
   notifyBookingCreated,
   type BookingNotifyData,
 } from './notifications';
+import {
+  loadPricingConfig,
+  calculatePriceQuote,
+  detectVehicleType,
+  getOccupancyRate,
+  getCustomerBookingCount,
+} from './pricing';
 
 // ─── Create Booking ──────────────────────────────────────────────────
 
@@ -243,7 +250,73 @@ export const completeBooking = functions
 
     logInfo(ctx, 'Completing booking', { bookingId: input.bookingId });
 
+    // ── Dynamic pricing calculation ────────────────────────────────
     const bRef = bookingRef(auth.companyId, input.bookingId);
+    const preDoc = await bRef.get();
+    if (!preDoc.exists) throw new functions.https.HttpsError('not-found', 'Booking not found.');
+    const preData = preDoc.data()!;
+
+    let finalAmount = input.paymentAmount;
+    let pricingQuoteId: string | null = null;
+
+    // Use dynamic pricing when no manual amount override is provided
+    if (input.paymentAmount <= 0) {
+      const createdAt = preData['createdAt']?.toDate?.() ?? new Date(preData['createdAt']);
+      const now = new Date();
+      const actualHours = Math.max(0.5, (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60));
+
+      const vehicleMake = (preData['vehicle']?.['make'] || '').toLowerCase();
+      const vehicleModel = (preData['vehicle']?.['model'] || '').toLowerCase();
+      const vehicleType = detectVehicleType(vehicleMake, vehicleModel);
+
+      // Preserve advance booking discount
+      const bookedAt = preData['history']?.[0]?.timestamp
+        ? new Date(preData['history'][0].timestamp)
+        : createdAt;
+      const daysInAdvance = Math.max(0, Math.floor((createdAt.getTime() - bookedAt.getTime()) / (1000 * 60 * 60 * 24)));
+
+      const customerPhone = preData['customerPhone'] || '';
+      const [config, occupancy, customerBookings] = await Promise.all([
+        loadPricingConfig(auth.companyId),
+        getOccupancyRate(auth.companyId),
+        getCustomerBookingCount(auth.companyId, customerPhone),
+      ]);
+
+      const quote = calculatePriceQuote({
+        config,
+        estimatedHours: Math.round(actualHours * 100) / 100,
+        vehicleType,
+        daysInAdvance,
+        customerBookingCount: customerBookings,
+        currentOccupancy: occupancy,
+      });
+
+      finalAmount = quote.totalPrice;
+      pricingQuoteId = quote.quoteId;
+
+      // Persist the quote for audit trail
+      await db
+        .collection('companies')
+        .doc(auth.companyId)
+        .collection('priceQuotes')
+        .doc(quote.quoteId)
+        .set({
+          ...quote,
+          companyId: auth.companyId,
+          bookingId: input.bookingId,
+          createdBy: auth.uid,
+          createdAt: now.toISOString(),
+        });
+
+      logInfo(ctx, 'Dynamic price calculated', {
+        bookingId: input.bookingId,
+        actualHours: Math.round(actualHours * 100) / 100,
+        totalPrice: quote.totalPrice,
+        quoteId: quote.quoteId,
+      });
+    }
+
+    // ── Transaction: complete booking ────────────────────────────────
     await db.runTransaction(async (tx) => {
       const bDoc = await tx.get(bRef);
       if (!bDoc.exists) throw new functions.https.HttpsError('not-found', 'Booking not found.');
@@ -266,8 +339,9 @@ export const completeBooking = functions
         status: 'Completed',
         payment: {
           method: input.paymentMethod,
-          amount: input.paymentAmount,
+          amount: finalAmount,
           status: 'paid',
+          ...(pricingQuoteId ? { quoteId: pricingQuoteId } : {}),
         },
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         completedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -275,7 +349,7 @@ export const completeBooking = functions
           status: 'Completed',
           timestamp: new Date().toISOString(),
           userId: auth.uid,
-          note: `Completed — $${input.paymentAmount} via ${input.paymentMethod}`,
+          note: `Completed — $${finalAmount} via ${input.paymentMethod}`,
         }),
       });
 
@@ -285,7 +359,7 @@ export const completeBooking = functions
         statsRef(auth.companyId, today),
         {
           completedCount: admin.firestore.FieldValue.increment(1),
-          totalRevenue: admin.firestore.FieldValue.increment(input.paymentAmount),
+          totalRevenue: admin.firestore.FieldValue.increment(finalAmount),
         },
         { merge: true },
       );
@@ -296,11 +370,11 @@ export const completeBooking = functions
       uid: auth.uid,
       resourceType: 'booking',
       resourceId: input.bookingId,
-      details: { paymentMethod: input.paymentMethod, paymentAmount: input.paymentAmount },
+      details: { paymentMethod: input.paymentMethod, paymentAmount: finalAmount, pricingQuoteId },
       correlationId,
     });
 
-    logInfo(ctx, 'Booking completed', { bookingId: input.bookingId, amount: input.paymentAmount });
+    logInfo(ctx, 'Booking completed', { bookingId: input.bookingId, amount: finalAmount });
     return { success: true };
   });
 

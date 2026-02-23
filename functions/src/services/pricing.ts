@@ -70,6 +70,7 @@ export interface PricingConfig {
   minTotalMultiplier: number;      // Floor, e.g. 0.5 (never below 50% of base)
   smoothingFactor: number;         // EMA alpha, e.g. 0.3 (0 = no smoothing, 1 = no memory)
   lastSmoothedMultiplier: number;  // Previous EMA value for continuity
+  minimumCharge: number;           // Absolute minimum price floor, e.g. 3.00
 }
 
 export interface DemandTier {
@@ -143,6 +144,8 @@ export interface PriceQuote {
   dailyCapApplied: boolean;        // Whether daily cap was hit
   savingsFromLoyalty: number;      // Dollar amount saved via loyalty
   savingsFromAdvance: number;      // Dollar amount saved via advance booking
+  durationBreakdown: Array<{ hours: number; rate: number; amount: number }>;
+  minimumChargeApplied: boolean;
 
   // Metadata
   quotedAt: string;                // ISO timestamp
@@ -239,6 +242,7 @@ export const DEFAULT_PRICING_CONFIG: PricingConfig = {
   minTotalMultiplier: 0.50,     // Never below 50% of base price
   smoothingFactor: 0.30,        // 30% new value, 70% previous (prevents shock)
   lastSmoothedMultiplier: 1.0,
+  minimumCharge: 3.00,          // Absolute minimum charge ($3)
 };
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -279,7 +283,9 @@ export function getDayOfWeekFactor(config: PricingConfig, dayOfWeek: number): Pr
  */
 export function getDemandFactor(config: PricingConfig, occupancyRate: number): PricingFactor {
   const occ = Math.max(0, Math.min(1, occupancyRate));
-  const tier = config.demandTiers.find(t => occ >= t.minOccupancy && occ < t.maxOccupancy);
+  // Use <= for last tier to handle 100% occupancy correctly
+  const tier = config.demandTiers.find(t => occ >= t.minOccupancy && occ < t.maxOccupancy)
+    ?? config.demandTiers.find(t => occ >= t.minOccupancy && occ <= t.maxOccupancy);
   const mult = tier?.multiplier ?? 1.0;
 
   let desc: string;
@@ -510,7 +516,7 @@ export function calculatePriceQuote(params: {
   const effectiveHourlyRate = Math.round(config.baseHourlyRate * smoothedMultiplier * 100) / 100;
 
   // Duration-aware subtotal calculation
-  const { subtotal } = calculateDurationSubtotal(config, effectiveHourlyRate, estimatedHours);
+  const { subtotal, breakdown: durationBreakdown } = calculateDurationSubtotal(config, effectiveHourlyRate, estimatedHours);
 
   // Apply daily cap — price per day never exceeds daily rate × smoothedMultiplier
   const effectiveDailyCap = Math.round(config.baseDailyRate * smoothedMultiplier * 100) / 100;
@@ -519,9 +525,14 @@ export function calculatePriceQuote(params: {
   const dailyCapApplied = subtotal > maxByDailyCap;
   const cappedSubtotal = dailyCapApplied ? maxByDailyCap : subtotal;
 
+  // Apply minimum charge
+  const minimumCharge = config.minimumCharge ?? 3.00;
+  const minimumChargeApplied = cappedSubtotal < minimumCharge;
+  const finalSubtotal = Math.max(cappedSubtotal, minimumCharge);
+
   // Tax
-  const taxAmount = Math.round(cappedSubtotal * config.taxRate * 100) / 100;
-  const totalPrice = Math.round((cappedSubtotal + taxAmount) * 100) / 100;
+  const taxAmount = Math.round(finalSubtotal * config.taxRate * 100) / 100;
+  const totalPrice = Math.round((finalSubtotal + taxAmount) * 100) / 100;
 
   // Calculate savings
   const loyaltyFactor = factors.find(f => f.name === 'Loyalty');
@@ -553,7 +564,7 @@ export function calculatePriceQuote(params: {
     cappedMultiplier: Math.round(cappedMultiplier * 1000) / 1000,
     smoothedMultiplier: Math.round(smoothedMultiplier * 1000) / 1000,
     effectiveHourlyRate,
-    subtotal: cappedSubtotal,
+    subtotal: finalSubtotal,
     taxAmount,
     taxRate: config.taxRate,
     totalPrice,
@@ -561,6 +572,8 @@ export function calculatePriceQuote(params: {
     dailyCapApplied,
     savingsFromLoyalty,
     savingsFromAdvance,
+    durationBreakdown,
+    minimumChargeApplied,
     quotedAt: now.toISOString(),
     validUntil,
     quoteId,
@@ -592,6 +605,7 @@ export const UpdatePricingConfigSchema = z.object({
   minTotalMultiplier: z.number().min(0).max(1).optional(),
   smoothingFactor: z.number().min(0).max(1).optional(),
   vehicleSurcharges: z.record(z.string(), z.number().min(-1).max(5)).optional(),
+  minimumCharge: z.number().min(0).max(1000).optional(),
 });
 
 export type UpdatePricingConfigRequest = z.infer<typeof UpdatePricingConfigSchema>;
@@ -630,13 +644,14 @@ export async function loadPricingConfig(companyId: string): Promise<PricingConfi
       ? data['loyaltyTiers'] : DEFAULT_PRICING_CONFIG.loyaltyTiers,
     vehicleSurcharges: typeof data['vehicleSurcharges'] === 'object' && data['vehicleSurcharges'] !== null
       ? data['vehicleSurcharges'] : DEFAULT_PRICING_CONFIG.vehicleSurcharges,
+    minimumCharge: typeof data['minimumCharge'] === 'number' ? data['minimumCharge'] : DEFAULT_PRICING_CONFIG.minimumCharge,
   };
 }
 
 /**
  * Get real-time occupancy rate for a company
  */
-async function getOccupancyRate(companyId: string): Promise<number> {
+export async function getOccupancyRate(companyId: string): Promise<number> {
   const locsSnap = await db.collection('companies').doc(companyId).collection('locations').get();
   if (locsSnap.empty) return 0.5; // Default to 50% if no locations
 
@@ -664,7 +679,7 @@ async function getOccupancyRate(companyId: string): Promise<number> {
 /**
  * Get customer's historical booking count for loyalty calculation
  */
-async function getCustomerBookingCount(companyId: string, customerPhone: string): Promise<number> {
+export async function getCustomerBookingCount(companyId: string, customerPhone: string): Promise<number> {
   if (!customerPhone) return 0;
 
   const snap = await db
@@ -783,12 +798,15 @@ export const calculateCompletionPrice = functions
     const now = new Date();
     const actualHours = Math.max(0.5, (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60));
 
-    // Determine vehicle type from make
+    // Determine vehicle type from make/model
     const vehicleMake = (bData['vehicle']?.['make'] || '').toLowerCase();
-    const vehicleType = detectVehicleType(vehicleMake);
+    const vehicleModel = (bData['vehicle']?.['model'] || '').toLowerCase();
+    const vehicleType = detectVehicleType(vehicleMake, vehicleModel);
 
     // Calculate advance booking days (0 = was same-day)
-    const daysInAdvance = 0; // Completion uses current rate, not booking-time rate
+    // Preserve advance booking discount — calculate from when they originally booked
+    const bookedAt = bData['history']?.[0]?.timestamp ? new Date(bData['history'][0].timestamp) : createdAt;
+    const daysInAdvance = Math.max(0, Math.floor((createdAt.getTime() - bookedAt.getTime()) / (1000 * 60 * 60 * 24)));
 
     // Load config + occupancy + loyalty
     const customerPhone = bData['customerPhone'] || '';
@@ -857,20 +875,36 @@ export const updatePricingConfig = functions
 // ═══════════════════════════════════════════════════════════════════════
 
 const LUXURY_MAKES = new Set([
-  'mercedes', 'bmw', 'audi', 'lexus', 'porsche', 'maserati',
+  'mercedes', 'mercedes-benz', 'bmw', 'audi', 'lexus', 'porsche', 'maserati',
   'bentley', 'rolls-royce', 'ferrari', 'lamborghini', 'aston martin',
   'jaguar', 'land rover', 'range rover', 'cadillac', 'lincoln',
-  'genesis', 'infiniti', 'acura', 'volvo', 'tesla',
+  'genesis', 'infiniti', 'acura', 'volvo',
 ]);
 
 const EV_MAKES = new Set(['tesla', 'rivian', 'lucid', 'polestar']);
 
+const SUV_MODELS = new Set([
+  'suburban', 'tahoe', 'expedition', 'navigator', 'escalade', 'yukon',
+  'sequoia', '4runner', 'highlander', 'explorer', 'durango',
+  'grand cherokee', 'wrangler', 'bronco', 'defender',
+]);
+
+const TRUCK_MODELS = new Set([
+  'f-150', 'f-250', 'f-350', 'silverado', 'sierra', 'ram', 'tundra',
+  'tacoma', 'ranger', 'colorado', 'gladiator', 'frontier', 'titan',
+  'maverick', 'ridgeline', 'santa cruz',
+]);
+
 /**
- * Auto-detect vehicle type from make/model for surcharge calculation
+ * Auto-detect vehicle type from make/model for surcharge calculation.
+ * Priority: EV > Luxury > SUV/Truck > Standard
  */
-export function detectVehicleType(make: string): string {
+export function detectVehicleType(make: string, model?: string): string {
   const m = make.toLowerCase().trim();
+  const mdl = (model || '').toLowerCase().trim();
   if (EV_MAKES.has(m)) return 'ev';
   if (LUXURY_MAKES.has(m)) return 'luxury';
+  if (SUV_MODELS.has(mdl)) return 'suv';
+  if (TRUCK_MODELS.has(mdl)) return 'truck';
   return 'standard';
 }

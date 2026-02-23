@@ -634,4 +634,198 @@ describe('DEFAULT_PRICING_CONFIG', () => {
     const maxH = Math.max(...DEFAULT_PRICING_CONFIG.durationBrackets.map(b => b.maxHours));
     expect(maxH).toBe(999);
   });
+
+  it('should have a positive minimumCharge', () => {
+    expect(DEFAULT_PRICING_CONFIG.minimumCharge).toBeGreaterThan(0);
+    expect(DEFAULT_PRICING_CONFIG.minimumCharge).toBe(3.00);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  14. MINIMUM CHARGE
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('minimumCharge', () => {
+  it('should enforce minimum charge on very short cheap stays', () => {
+    // Off-peak, low demand, EV, platinum, 30 days advance — cheapest possible
+    const cheapConfig: PricingConfig = {
+      ...config,
+      minimumCharge: 3.00,
+      smoothingFactor: 1.0, // No smoothing for predictable result
+    };
+    const quote = calculatePriceQuote({
+      config: cheapConfig,
+      estimatedHours: 0.5, // 30 minutes — tiny
+      vehicleType: 'ev',
+      daysInAdvance: 30,
+      customerBookingCount: 100,
+      currentOccupancy: 0.10,
+      currentDate: new Date('2026-06-16T02:00:00'),
+    });
+
+    expect(quote.totalPrice).toBeGreaterThanOrEqual(3.00);
+    expect(quote.minimumChargeApplied).toBeDefined();
+  });
+
+  it('should not apply minimum charge when subtotal exceeds it', () => {
+    const quote = calculatePriceQuote({
+      config: { ...config, minimumCharge: 1.00 },
+      estimatedHours: 4,
+      currentDate: new Date('2026-06-15T10:00:00'),
+      currentOccupancy: 0.50,
+    });
+
+    expect(quote.minimumChargeApplied).toBe(false);
+    expect(quote.totalPrice).toBeGreaterThan(1.00);
+  });
+
+  it('should apply minimum charge when subtotal is below it', () => {
+    const highMinConfig: PricingConfig = {
+      ...config,
+      minimumCharge: 999.00,
+      smoothingFactor: 1.0,
+    };
+    const quote = calculatePriceQuote({
+      config: highMinConfig,
+      estimatedHours: 0.5,
+      currentDate: new Date('2026-06-15T10:00:00'),
+      currentOccupancy: 0.50,
+    });
+
+    expect(quote.minimumChargeApplied).toBe(true);
+    expect(quote.subtotal).toBe(999.00);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  15. DURATION BREAKDOWN IN QUOTES
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('durationBreakdown in PriceQuote', () => {
+  it('should include durationBreakdown array in quotes', () => {
+    const quote = calculatePriceQuote({
+      config,
+      estimatedHours: 4,
+      currentDate: new Date('2026-06-15T10:00:00'),
+      currentOccupancy: 0.50,
+    });
+
+    expect(quote.durationBreakdown).toBeDefined();
+    expect(Array.isArray(quote.durationBreakdown)).toBe(true);
+    expect(quote.durationBreakdown.length).toBeGreaterThan(0);
+  });
+
+  it('should have hours, rate, and amount in each breakdown entry', () => {
+    const quote = calculatePriceQuote({
+      config: { ...config, smoothingFactor: 1.0 },
+      estimatedHours: 8,
+      currentDate: new Date('2026-06-15T12:00:00'), // noon, standard
+      currentOccupancy: 0.50,
+    });
+
+    for (const entry of quote.durationBreakdown) {
+      expect(entry).toHaveProperty('hours');
+      expect(entry).toHaveProperty('rate');
+      expect(entry).toHaveProperty('amount');
+      expect(entry.hours).toBeGreaterThan(0);
+      expect(entry.rate).toBeGreaterThan(0);
+      expect(entry.amount).toBeGreaterThan(0);
+    }
+  });
+
+  it('should have descending rates for longer sits (degression)', () => {
+    const quote = calculatePriceQuote({
+      config: { ...config, smoothingFactor: 1.0 },
+      estimatedHours: 48,
+      currentDate: new Date('2026-06-15T12:00:00'),
+      currentOccupancy: 0.50,
+    });
+
+    const rates = quote.durationBreakdown.map(b => b.rate);
+    for (let i = 1; i < rates.length; i++) {
+      expect(rates[i]).toBeLessThanOrEqual(rates[i - 1]!);
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  16. 100% OCCUPANCY EDGE CASE
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('100% occupancy handling', () => {
+  it('should find a tier at exactly 100% occupancy', () => {
+    const f = getDemandFactor(config, 1.0);
+    expect(f.multiplier).toBeGreaterThan(0);
+    expect(f.multiplier).toBe(1.75); // Near capacity tier
+  });
+
+  it('should not return NaN or undefined multiplier at 100%', () => {
+    const f = getDemandFactor(config, 1.0);
+    expect(f.multiplier).not.toBeNaN();
+    expect(f.multiplier).toBeDefined();
+  });
+
+  it('should handle 99.9% occupancy', () => {
+    const f = getDemandFactor(config, 0.999);
+    expect(f.multiplier).toBe(1.75);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  17. ENHANCED VEHICLE TYPE DETECTION (make + model)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('detectVehicleType (enhanced)', () => {
+  it('should detect Tesla as EV (not luxury)', () => {
+    expect(detectVehicleType('tesla')).toBe('ev');
+    expect(detectVehicleType('Tesla')).toBe('ev');
+  });
+
+  it('should detect Rivian as EV', () => {
+    expect(detectVehicleType('rivian')).toBe('ev');
+  });
+
+  it('should detect Lucid as EV', () => {
+    expect(detectVehicleType('lucid')).toBe('ev');
+  });
+
+  it('should detect Polestar as EV', () => {
+    expect(detectVehicleType('polestar')).toBe('ev');
+  });
+
+  it('should detect Mercedes-Benz as luxury', () => {
+    expect(detectVehicleType('mercedes-benz')).toBe('luxury');
+    expect(detectVehicleType('mercedes')).toBe('luxury');
+  });
+
+  it('should detect SUVs by model', () => {
+    expect(detectVehicleType('chevrolet', 'Suburban')).toBe('suv');
+    expect(detectVehicleType('ford', 'Expedition')).toBe('suv');
+    expect(detectVehicleType('toyota', 'Sequoia')).toBe('suv');
+    expect(detectVehicleType('jeep', 'Grand Cherokee')).toBe('suv');
+  });
+
+  it('should detect trucks by model', () => {
+    expect(detectVehicleType('ford', 'F-150')).toBe('truck');
+    expect(detectVehicleType('chevrolet', 'Silverado')).toBe('truck');
+    expect(detectVehicleType('toyota', 'Tundra')).toBe('truck');
+    expect(detectVehicleType('ram', 'Ram')).toBe('truck');
+  });
+
+  it('should prioritize EV over luxury', () => {
+    // Tesla is in EV makes — should not be luxury
+    expect(detectVehicleType('tesla', 'Model S')).toBe('ev');
+  });
+
+  it('should default to standard for unknown', () => {
+    expect(detectVehicleType('toyota')).toBe('standard');
+    expect(detectVehicleType('honda')).toBe('standard');
+    expect(detectVehicleType('hyundai', 'Sonata')).toBe('standard');
+  });
+
+  it('should be case insensitive for model', () => {
+    expect(detectVehicleType('ford', 'f-150')).toBe('truck');
+    expect(detectVehicleType('ford', 'F-150')).toBe('truck');
+    expect(detectVehicleType('FORD', 'EXPEDITION')).toBe('suv');
+  });
 });
