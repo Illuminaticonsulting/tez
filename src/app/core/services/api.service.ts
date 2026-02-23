@@ -1,51 +1,21 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { AuthService } from './auth.service';
-import { environment } from '../../../environments/environment';
-import { firstValueFrom } from 'rxjs';
+import { Functions, httpsCallable } from '@angular/fire/functions';
 
+/**
+ * ApiService wraps Firebase httpsCallable — no raw HTTP, no exposed URLs.
+ * All Cloud Functions are called via the Firebase SDK callable protocol.
+ */
 @Injectable({ providedIn: 'root' })
 export class ApiService {
-  private http = inject(HttpClient);
-  private auth = inject(AuthService);
+  private functions = inject(Functions);
 
-  private get baseUrl(): string {
-    return environment.functionsUrl;
-  }
-
-  private async getHeaders(): Promise<HttpHeaders> {
-    const token = await this.auth.getIdToken();
-    return new HttpHeaders({
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    });
-  }
-
-  async get<T>(endpoint: string, params?: Record<string, string>): Promise<T> {
-    const headers = await this.getHeaders();
-    return firstValueFrom(
-      this.http.get<T>(`${this.baseUrl}/${endpoint}`, { headers, params })
-    );
-  }
-
-  async post<T>(endpoint: string, body: any): Promise<T> {
-    const headers = await this.getHeaders();
-    return firstValueFrom(
-      this.http.post<T>(`${this.baseUrl}/${endpoint}`, body, { headers })
-    );
-  }
-
-  async put<T>(endpoint: string, body: any): Promise<T> {
-    const headers = await this.getHeaders();
-    return firstValueFrom(
-      this.http.put<T>(`${this.baseUrl}/${endpoint}`, body, { headers })
-    );
-  }
-
-  async delete<T>(endpoint: string): Promise<T> {
-    const headers = await this.getHeaders();
-    return firstValueFrom(
-      this.http.delete<T>(`${this.baseUrl}/${endpoint}`, { headers })
-    );
+  /**
+   * Call a Firebase Cloud Function by name.
+   * Automatically handles auth token injection & error unwrapping.
+   */
+  async call<T = any>(functionName: string, data: Record<string, any> = {}): Promise<T> {
+    const fn = httpsCallable<Record<string, any>, T>(this.functions, functionName);
+    const result = await fn(data);
+    return result.data;
   }
 }

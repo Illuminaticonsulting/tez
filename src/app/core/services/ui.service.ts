@@ -24,23 +24,24 @@ export class UiService {
     await toast.present();
   }
 
+  /** #44 fix — no async Promise executor anti-pattern */
   async confirm(
     header: string,
     message: string,
     confirmText = 'Confirm',
     cancelText = 'Cancel'
   ): Promise<boolean> {
-    return new Promise(async (resolve) => {
-      const alert = await this.alertCtrl.create({
-        header,
-        message,
-        buttons: [
-          { text: cancelText, role: 'cancel', handler: () => resolve(false) },
-          { text: confirmText, role: 'confirm', handler: () => resolve(true) },
-        ],
-      });
-      await alert.present();
+    const alert = await this.alertCtrl.create({
+      header,
+      message,
+      buttons: [
+        { text: cancelText, role: 'cancel' },
+        { text: confirmText, role: 'confirm' },
+      ],
     });
+    await alert.present();
+    const { role } = await alert.onDidDismiss();
+    return role === 'confirm';
   }
 
   async showLoading(message = 'Loading...'): Promise<void> {
@@ -56,32 +57,27 @@ export class UiService {
     this.loadingRef = null;
   }
 
+  /** #44 fix */
   async prompt(
     header: string,
     message: string,
     inputName = 'value',
     inputPlaceholder = ''
   ): Promise<string | null> {
-    return new Promise(async (resolve) => {
-      const alert = await this.alertCtrl.create({
-        header,
-        message,
-        inputs: [
-          {
-            name: inputName,
-            type: 'text',
-            placeholder: inputPlaceholder,
-          },
-        ],
-        buttons: [
-          { text: 'Cancel', role: 'cancel', handler: () => resolve(null) },
-          {
-            text: 'OK',
-            handler: (data) => resolve(data[inputName]),
-          },
-        ],
-      });
-      await alert.present();
+    const alert = await this.alertCtrl.create({
+      header,
+      message,
+      inputs: [{ name: inputName, type: 'text', placeholder: inputPlaceholder }],
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        { text: 'OK', role: 'confirm' },
+      ],
     });
+    await alert.present();
+    const { data, role } = await alert.onDidDismiss();
+    if (role === 'confirm' && data?.values) {
+      return data.values[inputName] ?? null;
+    }
+    return null;
   }
 }

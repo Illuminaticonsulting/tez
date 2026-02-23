@@ -1,61 +1,56 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, inject, signal, computed } from '@angular/core';
 import { ApiService } from './api.service';
-import { AuthService } from './auth.service';
-import { environment } from '../../../environments/environment';
 
 export interface FlightInfo {
   airline: string;
   flightNumber: string;
-  departureAirport: string;
-  arrivalAirport: string;
-  scheduledDeparture: string;
   scheduledArrival: string;
-  status: string;
+  estimatedArrival: string;
+  status: 'scheduled' | 'en-route' | 'landed' | 'delayed' | 'cancelled';
   gate?: string;
   terminal?: string;
-  delay?: number;
+  origin?: string;
 }
 
 @Injectable({ providedIn: 'root' })
 export class FlightService {
   private api = inject(ApiService);
 
-  readonly loading = signal(false);
+  private readonly _flight = signal<FlightInfo | null>(null);
+  private readonly _loading = signal(false);
+  private readonly _error = signal<string | null>(null);
 
-  /** Fetch flight status via server-side proxy (no API keys exposed) */
-  async getFlightStatus(
-    airlineCode: string,
-    flightNumber: string,
-    date: string // YYYY-MM-DD
-  ): Promise<FlightInfo | null> {
-    this.loading.set(true);
+  readonly flight = this._flight.asReadonly();
+  readonly loading = this._loading.asReadonly();
+  readonly error = this._error.asReadonly();
+
+  readonly isDelayed = computed(
+    () => this._flight()?.status === 'delayed'
+  );
+
+  /** Uses api.call() (httpsCallable) instead of HTTP GET */
+  async lookupFlight(flightNumber: string): Promise<FlightInfo | null> {
+    this._loading.set(true);
+    this._error.set(null);
     try {
-      const result = await this.api.get<FlightInfo>(
-        `flights/status?airline=${airlineCode}&flight=${flightNumber}&date=${date}`
-      );
-      return result;
-    } catch {
+      const info = await this.api.call<FlightInfo>('lookupFlight', {
+        flightNumber: flightNumber.trim().toUpperCase(),
+      });
+      this._flight.set(info);
+      return info;
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Flight lookup failed';
+      this._error.set(message);
+      this._flight.set(null);
       return null;
     } finally {
-      this.loading.set(false);
+      this._loading.set(false);
     }
   }
 
-  /** Get flight schedule */
-  async getFlightSchedule(
-    airlineCode: string,
-    flightNumber: string,
-    date: string
-  ): Promise<FlightInfo[]> {
-    this.loading.set(true);
-    try {
-      return await this.api.get<FlightInfo[]>(
-        `flights/schedule?airline=${airlineCode}&flight=${flightNumber}&date=${date}`
-      );
-    } catch {
-      return [];
-    } finally {
-      this.loading.set(false);
-    }
+  clear(): void {
+    this._flight.set(null);
+    this._error.set(null);
   }
 }

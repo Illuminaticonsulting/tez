@@ -29,8 +29,10 @@
               {
                 "glob": "**/*",
                 "input": "public"
-              }
+              },
+              "src/manifest.webmanifest"
             ],
+            "serviceWorker": "ngsw-config.json",
             "styles": [
               "src/styles.scss"
             ],

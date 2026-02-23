@@ -9,6 +9,8 @@ export interface BannerMessage {
   autoDismiss: boolean;
 }
 
+const MAX_BANNERS = 5; // #18 cap
+
 @Injectable({ providedIn: 'root' })
 export class NotificationService {
   private nextId = 0;
@@ -24,7 +26,12 @@ export class NotificationService {
   ): void {
     const id = ++this.nextId;
     const banner: BannerMessage = { id, message, type, autoDismiss };
-    this.banners.update((b) => [...b, banner]);
+
+    this.banners.update((b) => {
+      const next = [...b, banner];
+      // #18 — evict oldest if over max
+      return next.length > MAX_BANNERS ? next.slice(next.length - MAX_BANNERS) : next;
+    });
 
     if (autoDismiss) {
       setTimeout(() => this.dismissBanner(id), durationMs);
@@ -56,25 +63,21 @@ export class NotificationService {
     }
 
     audio.currentTime = 0;
-    audio.play().catch(() => {
-      // Browser may block autoplay — that's OK
-    });
+    audio.play().catch(() => { /* Browser autoplay policy — OK */ });
   }
 
-  /** Request browser notification permission */
   async requestPermission(): Promise<boolean> {
     if (!('Notification' in window)) return false;
     const result = await Notification.requestPermission();
     return result === 'granted';
   }
 
-  /** Show a browser notification (works even when tab is not focused) */
   showBrowserNotification(title: string, body: string): void {
-    if (Notification.permission !== 'granted') return;
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
     new Notification(title, {
       body,
-      icon: 'assets/icon/favicon.png',
-      badge: 'assets/icon/favicon.png',
+      icon: 'assets/icons/icon-192x192.png',
+      badge: 'assets/icons/icon-72x72.png',
     });
   }
 }

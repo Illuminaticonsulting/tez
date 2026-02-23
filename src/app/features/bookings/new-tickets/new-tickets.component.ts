@@ -1,30 +1,22 @@
-import { Component, inject, computed, signal } from '@angular/core';
+import { Component, inject, computed, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import {
-  IonContent,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
-  IonSearchbar,
-  IonRefresher,
-  IonRefresherContent,
+  IonContent, IonHeader, IonToolbar, IonTitle,
+  IonSearchbar, IonRefresher, IonRefresherContent, IonSkeletonText,
 } from '@ionic/angular/standalone';
 import { BookingService, UiService } from '../../../core/services';
 import { BookingCardComponent } from '../booking-card/booking-card.component';
 import { Booking } from '../../../core/models';
+import { SearchbarCustomEvent } from '@ionic/angular';
 
 @Component({
   selector: 'app-new-tickets',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    CommonModule,
-    IonContent,
-    IonHeader,
-    IonToolbar,
-    IonTitle,
-    IonSearchbar,
-    IonRefresher,
-    IonRefresherContent,
+    CommonModule, IonContent, IonHeader, IonToolbar, IonTitle,
+    IonSearchbar, IonRefresher, IonRefresherContent, IonSkeletonText,
     BookingCardComponent,
   ],
   template: `
@@ -38,12 +30,7 @@ import { Booking } from '../../../core/models';
         </ion-title>
       </ion-toolbar>
       <ion-toolbar>
-        <ion-searchbar
-          placeholder="Search new tickets..."
-          [debounce]="300"
-          (ionInput)="onSearch($event)"
-          animated
-        ></ion-searchbar>
+        <ion-searchbar placeholder="Search new tickets..." [debounce]="300" (ionInput)="onSearch($event)" animated aria-label="Search new tickets"></ion-searchbar>
       </ion-toolbar>
     </ion-header>
 
@@ -54,24 +41,28 @@ import { Booking } from '../../../core/models';
 
       <div class="list-container">
         @if (filtered().length > 0) {
-          <div class="alert-banner">
+          <div class="alert-banner" role="alert">
             🔔 {{ count() }} new ticket{{ count() > 1 ? 's' : '' }} need{{ count() === 1 ? 's' : '' }} attention!
           </div>
         }
 
-        @if (filtered().length === 0) {
-          <div class="empty-state">
+        @if (bookingSvc.loading()) {
+          @for (i of [1,2,3]; track i) {
+            <div class="skeleton-card">
+              <ion-skeleton-text [animated]="true" style="width: 45%; height: 20px"></ion-skeleton-text>
+              <ion-skeleton-text [animated]="true" style="width: 75%; height: 14px; margin-top: 8px"></ion-skeleton-text>
+            </div>
+          }
+        } @else if (filtered().length === 0) {
+          <div class="empty-state" role="status">
             <span class="empty-icon">✨</span>
             <h3>All Clear!</h3>
             <p>No new tickets at the moment</p>
           </div>
-        }
-
-        @for (booking of filtered(); track booking.id) {
-          <app-booking-card
-            [booking]="booking"
-            (actionClick)="onAction($event)"
-          ></app-booking-card>
+        } @else {
+          @for (booking of filtered(); track booking.id) {
+            <app-booking-card [booking]="booking" (actionClick)="onAction($event)" (cardClick)="onCardClick($event)"></app-booking-card>
+          }
         }
       </div>
     </ion-content>
@@ -85,35 +76,24 @@ import { Booking } from '../../../core/models';
       padding: 0 8px; margin-left: 8px; vertical-align: middle;
     }
     .count-badge--urgent { background: #f44336; color: white; animation: pulse 1.5s infinite; }
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.15); }
-    }
+    @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.15); } }
     .list-container { padding: 16px; }
     .alert-banner {
-      background: linear-gradient(135deg, #fff3e0, #ffe0b2);
-      color: #e65100;
-      padding: 14px 16px;
-      border-radius: 12px;
-      font-weight: 600;
-      font-size: 14px;
-      margin-bottom: 16px;
-      text-align: center;
-      animation: slideIn 0.3s ease-out;
+      background: linear-gradient(135deg, #fff3e0, #ffe0b2); color: #e65100;
+      padding: 14px 16px; border-radius: 12px; font-weight: 600; font-size: 14px;
+      margin-bottom: 16px; text-align: center; animation: slideIn .3s ease-out;
     }
+    .skeleton-card { background: white; border-radius: 16px; padding: 20px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
     .empty-state { text-align: center; padding: 60px 20px; color: #999; }
     .empty-icon { font-size: 48px; }
     .empty-state h3 { margin: 16px 0 8px; color: #555; }
-    @keyframes slideIn {
-      from { transform: translateY(-10px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
+    @keyframes slideIn { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
   `],
 })
 export class NewTicketsComponent {
-  private bookingSvc = inject(BookingService);
+  readonly bookingSvc = inject(BookingService);
   private ui = inject(UiService);
-
+  private router = inject(Router);
   private searchTerm = signal('');
 
   readonly count = computed(() => this.bookingSvc.groups().new.length);
@@ -122,20 +102,19 @@ export class NewTicketsComponent {
     const term = this.searchTerm().toLowerCase();
     const items = this.bookingSvc.groups().new;
     if (!term) return items;
-    return items.filter(
-      (b) =>
-        b.ticketNo.toString().includes(term) ||
-        b.vehicleTag.toLowerCase().includes(term) ||
-        b.customerName.toLowerCase().includes(term)
+    return items.filter(b =>
+      b.ticketNumber.toString().includes(term) ||
+      b.vehicle.plate.toLowerCase().includes(term) ||
+      b.customerName.toLowerCase().includes(term)
     );
   });
 
-  onSearch(e: any) { this.searchTerm.set(e.detail.value ?? ''); }
+  onSearch(e: SearchbarCustomEvent): void { this.searchTerm.set(e.detail.value ?? ''); }
 
-  async onAction(event: { booking: Booking; action: string }) {
+  async onAction(event: { booking: Booking; action: string }): Promise<void> {
     const { booking, action } = event;
     if (action === 'check-in') {
-      const ok = await this.ui.confirm('Check In', `Check in ticket #${booking.ticketNo}?`);
+      const ok = await this.ui.confirm('Check In', `Check in ticket #${booking.ticketNumber}?`);
       if (!ok) return;
       try {
         await this.ui.showLoading('Checking in...');
@@ -144,14 +123,15 @@ export class NewTicketsComponent {
       } catch { this.ui.toast('Failed to check in', 'danger'); }
       finally { await this.ui.hideLoading(); }
     } else if (action === 'cancel') {
-      const ok = await this.ui.confirm('Cancel Ticket', `Cancel ticket #${booking.ticketNo}?`);
+      const ok = await this.ui.confirm('Cancel Ticket', `Cancel ticket #${booking.ticketNumber}?`);
       if (!ok) return;
       try {
-        await this.bookingSvc.transitionStatus(booking.id, 'Cancelled');
+        await this.bookingSvc.cancelBooking(booking.id, 'Cancelled by operator');
         this.ui.toast('Ticket cancelled');
       } catch { this.ui.toast('Failed to cancel', 'danger'); }
     }
   }
 
-  onRefresh(e: any) { setTimeout(() => e.target.complete(), 500); }
+  onCardClick(booking: Booking): void { this.router.navigate(['/booking', booking.id]); }
+  onRefresh(e: CustomEvent): void { setTimeout(() => (e.target as HTMLIonRefresherElement).complete(), 500); }
 }

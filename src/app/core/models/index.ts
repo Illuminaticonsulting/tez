@@ -1,104 +1,94 @@
 // ============================================================
-// Tez — Core Data Models
-// Strongly-typed interfaces for the entire domain
+// Tez — Core Data Models (aligned with Cloud Functions schema)
 // ============================================================
 
-// ---- Booking / Ticket ----
+// ---- Booking Status ----
 export type BookingStatus =
   | 'New'
   | 'Booked'
   | 'Check-In'
   | 'Parked'
-  | 'Active'   // Vehicle exited, awaiting pickup
+  | 'Active'
   | 'Completed'
   | 'Cancelled';
 
-export type KeyStatus = 'keysCheckIn' | 'keysNotCheckIn';
-
+// ---- Booking (matches Firestore document written by Cloud Functions) ----
 export interface Booking {
   id: string;
-  ticketNo: number;
-  companyId: string;
+  ticketNumber: number;       // atomic counter from Cloud Functions
+  status: BookingStatus;
 
   // Customer
   customerName: string;
   customerPhone: string;
   customerEmail?: string;
 
-  // Vehicle
-  vehicleMake: string;
-  vehicleModel: string;
-  vehicleColor: string;
-  vehicleTag: string;        // license plate
-  vehiclePhotoUrl?: string;
+  // Vehicle (nested object in Firestore)
+  vehicle: {
+    make: string;
+    model: string;
+    color: string;
+    plate: string;
+    photoUrl: string;
+  };
 
   // Flight
-  airlineCode?: string;
-  flightNumber?: string;
+  flightNumber: string;
   flightStatus?: string;
-  airportCode?: string;
 
   // Parking
-  parkingSpotId: string | null;
-  parkingSpotName?: string;
-  locationId: string | null;
-  siteLocation?: string;
-  keyStatus: KeyStatus;
+  spotId: string;
+  locationId: string;
+  spotName?: string;
+  keysHandedOff: boolean;
 
-  // Swap
-  isSwapable?: boolean;
-  parkingSpotSwapableId?: string;
-  parkingSpotSwapable?: string;
+  // Notes
+  notes: string;
 
-  // Status
-  bookingStatus: BookingStatus;
-  waitingTime?: number;
-  waitingTimeDate?: string;
+  // Payment (nested object)
+  payment: {
+    method: string;
+    amount: number;
+    status: 'pending' | 'processing' | 'paid' | 'failed' | 'refunded';
+  };
 
-  // Dates (ISO-8601)
-  entryDate: string;
-  entryTime: string;
-  exitDate?: string;
-  exitTime?: string;
-  completedAt?: string;
+  // Damage report
+  damageReport?: {
+    hasDamage: boolean;
+    notes: string;
+    photoUrls: string[];
+    reportedBy: string;
+    reportedAt: string;
+  };
 
-  // Payment
-  paid: boolean;
-  amount?: number;
-  paymentId?: string;
-  paymentStatus?: PaymentStatus;
+  // Audit history (array in Firestore doc)
+  history: BookingHistoryEntry[];
 
-  // Metadata
-  createdAt: string;
-  updatedAt: string;
+  // Timestamps
+  createdAt: any; // Firestore Timestamp or string
+  updatedAt: any;
+  completedAt?: any;
   createdBy: string;
-  updatedBy?: string;
 }
 
-// ---- Booking History (Audit Trail) ----
+// ---- Booking History Entry (in-document array) ----
 export interface BookingHistoryEntry {
-  id: string;
-  bookingId: string;
-  previousStatus: BookingStatus;
-  newStatus: BookingStatus;
-  changedBy: string;
-  changedAt: string;
-  changes: Record<string, { old: unknown; new: unknown }>;
-  note?: string;
+  status: string;
+  timestamp: string;
+  userId: string;
+  note: string;
 }
 
-// ---- Parking Spot ----
+// ---- Parking Spot (path: companies/{id}/locations/{locId}/spots/{spotId}) ----
 export interface ParkingSpot {
   id: string;
   name: string;
   locationId: string;
-  isAvailable: boolean;
-  isReusable: boolean;
-  lockedBy: string | null;     // operator uid – optimistic lock
-  lockedAt: string | null;     // ISO-8601 – TTL for lock
-  returningDate: string | null;
+  status: 'available' | 'occupied' | 'maintenance';
   bookingId: string | null;
-  companyId: string;
+  lockedBy: string | null;
+  lockedAt: any | null;
+  returningDate: string | null;
   row?: string;
   column?: number;
   order?: number;
@@ -117,7 +107,7 @@ export interface ParkingLocation {
 export interface Company {
   id: string;
   name: string;
-  gatewayDomain: string;
+  gatewayDomain?: string;
   logoUrl?: string;
   smsTextExitOut?: string;
   smsTextCheckIn?: string;
@@ -130,7 +120,10 @@ export interface CompanySettings {
   autoSendSms: boolean;
   enableFlightTracking: boolean;
   maxActiveTickets: number;
-  spotLockTtlMinutes: number; // default 5
+  spotLockTtlSeconds: number; // default 30
+  hourlyRate: number;
+  dailyMax: number;
+  currency: string; // e.g. 'USD'
 }
 
 // ---- User / Operator ----
@@ -148,17 +141,12 @@ export interface AppUser {
 }
 
 // ---- Payment ----
-export type PaymentStatus =
-  | 'pending'
-  | 'processing'
-  | 'completed'
-  | 'failed'
-  | 'refunded';
+export type PaymentStatus = 'pending' | 'processing' | 'paid' | 'failed' | 'refunded';
 
 export interface Payment {
   id: string;
   bookingId: string;
-  ticketNo: number;
+  ticketNumber: number;
   amount: number;
   status: PaymentStatus;
   method?: string;
@@ -171,10 +159,10 @@ export interface Payment {
 export interface DailyStats {
   date: string;
   totalTickets: number;
-  completedTickets: number;
-  cancelledTickets: number;
+  completedCount: number;
+  cancelledCount: number;
   avgParkDurationMinutes: number;
-  revenue: number;
+  totalRevenue: number;
   spotUtilizationPct: number;
   peakHour: number;
 }
@@ -182,12 +170,12 @@ export interface DailyStats {
 // ---- Notifications ----
 export interface AppNotification {
   id: string;
-  type: 'new-ticket' | 'checkout' | 'payment' | 'alert';
+  type: 'new-booking' | 'checkout' | 'payment' | 'alert';
   title: string;
-  message: string;
+  body: string;
   bookingId?: string;
   read: boolean;
-  createdAt: string;
+  createdAt: any;
 }
 
 // ---- Grouped bookings for UI ----
@@ -198,13 +186,13 @@ export interface BookingGroups {
   booked: Booking[];   // Booked / Reservations
 }
 
-// ---- Status transition map ----
+// ---- Status transition map (aligned with Cloud Functions) ----
 export const VALID_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
-  'New':       ['Booked', 'Check-In', 'Cancelled'],
+  'New':       ['Booked', 'Cancelled'],
   'Booked':    ['Check-In', 'Cancelled'],
   'Check-In':  ['Parked', 'Cancelled'],
   'Parked':    ['Active', 'Cancelled'],
-  'Active':    ['Completed', 'Cancelled'],
+  'Active':    ['Completed'],
   'Completed': [],
   'Cancelled': [],
 };

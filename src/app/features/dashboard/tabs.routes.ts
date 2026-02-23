@@ -49,6 +49,13 @@ export const TABS_ROUTES: Routes = [
           ),
       },
       {
+        path: 'analytics',
+        loadComponent: () =>
+          import('../analytics/analytics.component').then(
+            (m) => m.AnalyticsComponent
+          ),
+      },
+      {
         path: '',
         redirectTo: 'issued',
         pathMatch: 'full',

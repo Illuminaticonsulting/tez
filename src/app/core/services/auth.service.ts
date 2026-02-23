@@ -7,11 +7,14 @@ import {
   onAuthStateChanged,
   User,
   getIdTokenResult,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
 } from '@angular/fire/auth';
 import { Router } from '@angular/router';
 import { AppUser, UserRole } from '../models';
 import { FirestoreService } from './firestore.service';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout, catchError, of } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -39,7 +42,12 @@ export class AuthService {
     });
   }
 
-  async login(email: string, password: string): Promise<void> {
+  /** Login with optional persistence control (#11 rememberMe) */
+  async login(email: string, password: string, rememberMe = true): Promise<void> {
+    await setPersistence(
+      this.auth,
+      rememberMe ? browserLocalPersistence : browserSessionPersistence
+    );
     const cred = await signInWithEmailAndPassword(this.auth, email, password);
     await this.loadUserProfile(cred.user.uid);
   }
@@ -61,12 +69,11 @@ export class AuthService {
     return user.getIdToken();
   }
 
-  /** Get custom claims (role, companyId) from the ID token */
-  async getClaims(): Promise<Record<string, any>> {
+  async getClaims(): Promise<Record<string, unknown>> {
     const user = this.auth.currentUser;
     if (!user) return {};
     const result = await getIdTokenResult(user);
-    return result.claims;
+    return result.claims as Record<string, unknown>;
   }
 
   hasRole(role: UserRole): boolean {
@@ -77,14 +84,38 @@ export class AuthService {
     return this.userRole() === 'admin';
   }
 
+  /** Load user profile with timeout to prevent infinite hang (#47) */
   private async loadUserProfile(uid: string): Promise<void> {
     try {
       const user = await firstValueFrom(
-        this.db.getDocument<AppUser>(`users/${uid}`)
+        this.db.getDocument<AppUser>(`users/${uid}`).pipe(
+          timeout(5000), // 5 second timeout prevents infinite hang
+          catchError(() => {
+            // User doc doesn't exist yet — build from auth claims
+            return of(null);
+          })
+        )
       );
-      this.appUser.set(user);
+
+      if (user) {
+        this.appUser.set(user);
+      } else {
+        // Fallback: build minimal AppUser from Firebase Auth + claims
+        const fbUser = this.auth.currentUser;
+        const claims = await this.getClaims();
+        if (fbUser) {
+          this.appUser.set({
+            uid: fbUser.uid,
+            email: fbUser.email || '',
+            displayName: fbUser.displayName || fbUser.email || 'User',
+            companyId: (claims['companyId'] as string) || '',
+            role: (claims['role'] as UserRole) || 'viewer',
+            isActive: true,
+          });
+        }
+      }
     } catch {
-      console.error('Failed to load user profile');
+      console.error('[Tez] Failed to load user profile');
     }
   }
 }

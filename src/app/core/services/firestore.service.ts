@@ -6,8 +6,6 @@ import {
   doc,
   docData,
   query,
-  where,
-  orderBy,
   updateDoc,
   addDoc,
   deleteDoc,
@@ -18,49 +16,52 @@ import {
   CollectionReference,
   QueryConstraint,
   serverTimestamp,
+  QuerySnapshot,
+  DocumentData,
 } from '@angular/fire/firestore';
-import { Observable, Subject, takeUntil, map, filter } from 'rxjs';
+import { Observable, filter } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class FirestoreService {
   private firestore = inject(Firestore);
 
   // ---- Read ----
-  getDocument<T>(path: string): Observable<T> {
+  getDocument<T extends DocumentData>(path: string): Observable<T> {
     const ref = doc(this.firestore, path) as DocumentReference<T>;
-    return docData(ref, { idField: 'id' as any }).pipe(
+    return (docData(ref, { idField: 'id' as never }) as Observable<T | undefined>).pipe(
       filter((v): v is T => v !== undefined)
     );
   }
 
-  getCollection<T>(
+  getCollection<T extends DocumentData>(
     path: string,
     constraints: QueryConstraint[] = []
   ): Observable<T[]> {
-    const ref = collection(this.firestore, path) as CollectionReference<T>;
-    const q = constraints.length ? query(ref, ...constraints) : ref;
-    return collectionData(q as any, { idField: 'id' as any }) as Observable<T[]>;
+    const colRef = collection(this.firestore, path) as CollectionReference<T>;
+    const q = constraints.length ? query(colRef, ...constraints) : colRef;
+    return collectionData(q, { idField: 'id' as never }) as unknown as Observable<T[]>;
   }
 
   /** Real-time listener returning an unsubscribe function */
-  listenToCollection<T>(
+  listenToCollection<T extends DocumentData>(
     path: string,
     constraints: QueryConstraint[],
     callback: (data: T[]) => void
   ): () => void {
-    const ref = collection(this.firestore, path) as CollectionReference<T>;
-    const q = query(ref, ...constraints);
-    return onSnapshot(q as any, (snapshot: any) => {
-      const docs = snapshot.docs.map((d: any) => ({
+    const colRef = collection(this.firestore, path) as CollectionReference<T>;
+    const q = query(colRef, ...constraints);
+
+    return onSnapshot(q, (snapshot: QuerySnapshot<T>) => {
+      const docs = snapshot.docs.map((d) => ({
         id: d.id,
         ...d.data(),
-      })) as T[];
+      } as unknown as T));
       callback(docs);
     });
   }
 
   // ---- Write (prefer Cloud Functions for mutations) ----
-  async addDocument<T extends Record<string, any>>(
+  async addDocument<T extends Record<string, unknown>>(
     path: string,
     data: T
   ): Promise<string> {
@@ -75,7 +76,7 @@ export class FirestoreService {
 
   async updateDocument(
     path: string,
-    data: Record<string, any>
+    data: Record<string, unknown>
   ): Promise<void> {
     const ref = doc(this.firestore, path);
     await updateDoc(ref, { ...data, updatedAt: serverTimestamp() });
@@ -86,19 +87,17 @@ export class FirestoreService {
     await deleteDoc(ref);
   }
 
-  // ---- Transactions (atomic operations) ----
+  // ---- Transactions ----
   async runTransaction<T>(
-    updateFn: (transaction: any) => Promise<T>
+    updateFn: (transaction: Parameters<Parameters<typeof runTransaction>[1]>[0]) => Promise<T>
   ): Promise<T> {
     return runTransaction(this.firestore, updateFn);
   }
 
-  // ---- Batch writes ----
   createBatch() {
     return writeBatch(this.firestore);
   }
 
-  // ---- Helpers ----
   docRef(path: string) {
     return doc(this.firestore, path);
   }

@@ -30,6 +30,14 @@ export const routes: Routes = [
       import('./features/dashboard/tabs.routes').then((m) => m.TABS_ROUTES),
   },
   {
+    path: 'booking/:id',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/bookings/booking-detail/booking-detail.component').then(
+        (m) => m.BookingDetailComponent
+      ),
+  },
+  {
     path: '',
     redirectTo: 'tabs',
     pathMatch: 'full',
